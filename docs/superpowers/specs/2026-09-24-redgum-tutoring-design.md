@@ -189,7 +189,7 @@ SQLite;时间字段用 `Date`/`Time`(SQLAlchemy),金额无关(本项目不涉及
 |------|------|------|------|
 | GET/POST | `/login` | 公开 | 登录表单 / 提交 |
 | POST | `/logout` | 登录 | 登出 |
-| GET | `/` | 登录 | ADMIN → `/schedule`;TUTOR → `/my-sessions` |
+| GET | `/` | 登录 | ADMIN → `/students`;TUTOR → `/my-sessions` |
 | GET | `/students` | ADMIN | 列表 + 姓名/年级搜索 + 状态筛选 |
 | GET/POST | `/students/new` | ADMIN | 新增(校验:姓名/年级/联系人必填) |
 | GET/POST | `/students/{id}/edit` | ADMIN | 编辑 |
