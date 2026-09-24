@@ -546,6 +546,9 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-constant-time-login")
+
+
 def current_user(request: Request, db: OrmSession = Depends(get_db)) -> AppUser | None:
     user_id = request.session.get("user_id")
     if user_id is None:
@@ -973,6 +976,7 @@ def test_inactive_user_cannot_log_in(client, db_session):
     db_session.commit()
     r = client.post("/login", data={"username": "gone", "password": DEMO_PASSWORD})
     assert r.status_code == 400
+    assert "Incorrect username or password" in r.text
 
 
 def test_anonymous_user_is_redirected_to_login(client):
@@ -987,10 +991,47 @@ def test_admin_lands_on_students_and_tutor_on_my_sessions(admin_client, tutor_cl
 
 
 def test_logout_clears_session(admin_client):
-    admin_client.post("/logout", follow_redirects=False)
+    r = admin_client.post("/logout", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/login"
     r = admin_client.get("/", follow_redirects=False)
     assert r.status_code == 303
     assert r.headers["location"] == "/login"
+
+
+def test_signed_in_user_is_redirected_away_from_login(admin_client):
+    r = admin_client.get("/login", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/"
+
+
+def test_signed_in_user_posting_login_is_redirected(admin_client):
+    r = admin_client.post("/login", data={"username": "deb", "password": "wrong"},
+                          follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/"
+
+
+def test_unknown_username_gets_the_same_generic_message(client, admin):
+    r = client.post("/login", data={"username": "nobody", "password": "whatever"})
+    assert r.status_code == 400
+    assert "Incorrect username or password" in r.text
+
+
+def test_login_establishes_a_session(client, admin):
+    r = client.post("/login", data={"username": "deb", "password": DEMO_PASSWORD},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    follow_up = client.get("/", follow_redirects=False)
+    assert follow_up.headers["location"] == "/students"
+
+
+def test_session_cookie_is_httponly_and_lax(client, admin):
+    r = client.post("/login", data={"username": "deb", "password": DEMO_PASSWORD},
+                    follow_redirects=False)
+    cookie = r.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
 ```
 
 - [ ] **Step 3: 运行确认失败**
@@ -1012,7 +1053,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from app.db import get_db
 from app.models import AppUser
-from app.security import verify_password
+from app.security import DUMMY_PASSWORD_HASH, verify_password
 from app.templating import flash, render
 
 router = APIRouter(tags=["auth"])
@@ -1028,10 +1069,13 @@ def login_form(request: Request):
 @router.post("/login")
 def login(request: Request, username: str = Form(""), password: str = Form(""),
           db: OrmSession = Depends(get_db)):
+    if request.session.get("user_id"):
+        return RedirectResponse("/", status_code=303)
     user = db.scalars(select(AppUser).where(AppUser.username == username.strip())).first()
-    if user is None or user.status != "ACTIVE" or not verify_password(password, user.password_hash):
+    password_ok = verify_password(password, user.password_hash if user else DUMMY_PASSWORD_HASH)
+    if user is None or user.status != "ACTIVE" or not password_ok:
         return render(request, "login.html",
-                      {"error": "Incorrect username or password.", "username": username},
+                      {"error": "Incorrect username or password.", "username": username.strip()},
                       status_code=400)
     request.session.clear()
     request.session["user_id"] = user.id
@@ -1042,6 +1086,7 @@ def login(request: Request, username: str = Form(""), password: str = Form(""),
 @router.post("/logout")
 def logout(request: Request):
     request.session.clear()
+    flash(request, "Signed out.")
     return RedirectResponse("/login", status_code=303)
 ```
 
@@ -1071,15 +1116,15 @@ def home(user: AppUser = Depends(require_user)):
 {% block content %}
   <section class="card" style="max-width: 420px; margin: 40px auto;">
     <h1>Sign in</h1>
-    {% if error %}<div class="errors">{{ error }}</div>{% endif %}
+    {% if error %}<div class="errors" role="alert">{{ error }}</div>{% endif %}
     <form method="post" action="/login">
       <div class="field">
         <label for="username">Username</label>
-        <input id="username" name="username" value="{{ username }}" autocomplete="username" autofocus>
+        <input id="username" name="username" value="{{ username }}" autocomplete="username" autofocus required>
       </div>
       <div class="field">
         <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password">
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
       </div>
       <button type="submit" class="primary">Sign in</button>
     </form>
@@ -1108,7 +1153,7 @@ app.include_router(views.router)
 uv run pytest tests/test_auth.py -q
 ```
 
-Expected: `7 passed`。
+Expected: `12 passed`。
 
 - [ ] **Step 8: 手工验证**
 
