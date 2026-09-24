@@ -94,6 +94,36 @@ def book_session(db: OrmSession, *, student: Student, tutor: Tutor, subject: str
     return session
 
 
+def move_session(db: OrmSession, session: Session, *, session_date: date, start_time: time,
+                 length_minutes: int) -> Session:
+    if session.status != "BOOKED":
+        raise DomainError("Only booked sessions can be moved.")
+    validate_slot(session.tutor, session_date, start_time, length_minutes)
+    session.session_date = session_date
+    session.start_time = start_time
+    session.length_minutes = length_minutes
+    db.commit()
+    return session
+
+
+def cancel_session(db: OrmSession, session: Session) -> Session:
+    if session.status != "BOOKED":
+        raise DomainError("Only booked sessions can be cancelled.")
+    session.status = "CANCELLED"
+    db.commit()
+    return session
+
+
+def set_outcome(db: OrmSession, session: Session, outcome: str) -> Session:
+    if session.status != "BOOKED":
+        raise DomainError("Only booked sessions can be marked.")
+    if outcome not in ("ATTENDED", "MISSED"):
+        raise DomainError("Outcome must be attended or missed.")
+    session.status = outcome
+    db.commit()
+    return session
+
+
 def list_sessions(db: OrmSession, *, date_from: date | None = None, date_to: date | None = None,
                   tutor_id: int | None = None, student_id: int | None = None,
                   status: str = "") -> list[Session]:
