@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit tutor' if tutor else 'Add tutor' }} — Redgum Tutoring{% endblock %}
+{% block content %}
+<section class="card" style="max-width: 560px;">
+  <h1>{{ 'Edit tutor' if tutor else 'Add tutor' }}</h1>
+  {% if errors %}
+    <div class="errors" role="alert">
+      <strong>Please fix the following:</strong>
+      <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post" action="{{ ('/tutors/' ~ tutor.id ~ '/edit') if tutor else '/tutors/new' }}">
+    <div class="field">
+      <label for="name">Tutor name *</label>
+      <input id="name" name="name" value="{{ form.get('name', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="subjects">Subjects taught *</label>
+      <input id="subjects" name="subjects" value="{{ form.get('subjects', '') }}"
+             placeholder="Physics 10-12, Chemistry 10-12" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone</label>
+      <input id="phone" name="phone" value="{{ form.get('phone', '') }}">
+    </div>
+    <button type="submit" class="primary">Save</button>
+    <a class="button" href="/tutors">Cancel</a>
+  </form>
+</section>
+{% endblock %}
