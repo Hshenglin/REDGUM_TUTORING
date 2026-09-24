@@ -1778,7 +1778,9 @@ def test_deactivate_tutor_keeps_sessions(admin_client, tutor_record, make_studen
     admin_client.post(f"/tutors/{tutor_record.id}/status", data={"status": "INACTIVE"})
     db_session.refresh(tutor_record)
     assert tutor_record.status == "INACTIVE"
+    db_session.refresh(session)
     assert session.status == "BOOKED"
+    assert session.tutor_id == tutor_record.id
 
 
 def test_tutor_cannot_access_tutor_admin(tutor_client):
@@ -1787,6 +1789,100 @@ def test_tutor_cannot_access_tutor_admin(tutor_client):
 
 def test_unknown_tutor_edit_returns_404(admin_client):
     assert admin_client.get("/tutors/9999/edit").status_code == 404
+
+
+def test_over_length_name_is_rejected(admin_client, db_session):
+    r = admin_client.post("/tutors/new", data={
+        "name": "x" * 101, "phone": "0400 000 000", "subjects": "Maths",
+    })
+    assert r.status_code == 400
+    assert "Tutor name must be 100 characters or fewer." in r.text
+    assert db_session.query(Tutor).count() == 0
+
+
+def test_over_length_subjects_is_rejected(admin_client, db_session):
+    r = admin_client.post("/tutors/new", data={
+        "name": "Priyanka Shah", "phone": "", "subjects": "x" * 201,
+    })
+    assert r.status_code == 400
+    assert "Subjects must be 200 characters or fewer." in r.text
+    assert db_session.query(Tutor).count() == 0
+
+
+def test_over_length_phone_is_rejected(admin_client, db_session):
+    r = admin_client.post("/tutors/new", data={
+        "name": "Priyanka Shah", "phone": "0" * 21, "subjects": "Maths",
+    })
+    assert r.status_code == 400
+    assert "Phone must be 20 characters or fewer." in r.text
+    assert db_session.query(Tutor).count() == 0
+
+
+def test_invalid_status_is_rejected(admin_client, tutor_record, db_session):
+    r = admin_client.post(f"/tutors/{tutor_record.id}/status", data={"status": "DELETED"})
+    assert r.status_code == 400
+    assert "Invalid status" in r.text
+    db_session.refresh(tutor_record)
+    assert tutor_record.status == "ACTIVE"
+
+
+def test_status_and_edit_on_unknown_tutor_return_404(admin_client):
+    assert admin_client.post("/tutors/9999/edit", data={
+        "name": "X", "phone": "", "subjects": "Y",
+    }).status_code == 404
+    assert admin_client.post("/tutors/9999/status", data={"status": "INACTIVE"}).status_code == 404
+    assert admin_client.post("/tutors/9999/status", data={"status": "BOGUS"}).status_code == 404
+
+
+def test_search_matches_subjects(admin_client, tutor_record):
+    r = admin_client.get("/tutors?q=Physics")
+    assert "Tomás Ferreira" in r.text
+    r = admin_client.get("/tutors?q=Chemistry")
+    assert "Tomás Ferreira" in r.text
+    r = admin_client.get("/tutors?q=Nuclear")
+    assert "Tomás Ferreira" not in r.text
+
+
+def test_edit_validation_failure_keeps_the_record(admin_client, tutor_record, db_session):
+    r = admin_client.post(f"/tutors/{tutor_record.id}/edit", data={
+        "name": "", "phone": "0407 512 884", "subjects": "",
+    })
+    assert r.status_code == 400
+    assert "Tutor name is required." in r.text
+    assert "Subjects are required." in r.text
+    assert f'action="/tutors/{tutor_record.id}/edit"' in r.text
+    db_session.refresh(tutor_record)
+    assert tutor_record.name == "Tomás Ferreira"
+    assert "Physics" in tutor_record.subjects
+
+
+def test_whitespace_only_name_and_subjects_are_rejected(admin_client, db_session):
+    r = admin_client.post("/tutors/new", data={"name": "   ", "phone": "", "subjects": "  "})
+    assert r.status_code == 400
+    assert "Tutor name is required." in r.text
+    assert "Subjects are required." in r.text
+    assert db_session.query(Tutor).count() == 0
+
+
+def test_phone_at_the_length_boundary(admin_client, db_session):
+    accepted = admin_client.post("/tutors/new", data={
+        "name": "Boundary Tutor", "phone": "0" * 20, "subjects": "Maths",
+    }, follow_redirects=False)
+    assert accepted.status_code == 303
+    rejected = admin_client.post("/tutors/new", data={
+        "name": "Too Long", "phone": "0" * 21, "subjects": "Maths",
+    })
+    assert rejected.status_code == 400
+    assert "Phone must be 20 characters or fewer." in rejected.text
+
+
+def test_reactivate_tutor(admin_client, tutor_record, db_session):
+    admin_client.post(f"/tutors/{tutor_record.id}/status", data={"status": "INACTIVE"})
+    db_session.refresh(tutor_record)
+    assert tutor_record.status == "INACTIVE"
+    admin_client.post(f"/tutors/{tutor_record.id}/status", data={"status": "ACTIVE"})
+    db_session.refresh(tutor_record)
+    assert tutor_record.status == "ACTIVE"
 ```
 
 - [ ] **Step 3: 运行确认失败**
@@ -1795,19 +1891,19 @@ def test_unknown_tutor_edit_returns_404(admin_client):
 uv run pytest tests/test_tutors.py -q
 ```
 
-Expected: 全部失败(404)。
+Expected: 功能测试全部失败(404);两个 404 断言测试因路由尚未注册而提前通过(实现后才有区分度)。
 
 - [ ] **Step 4: 写 `app/services/tutors.py`**
 
 ```python
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session as OrmSession
+from sqlalchemy.orm import Session as OrmSession, selectinload
 
 from app.models import Tutor
 
 
 def list_tutors(db: OrmSession, q: str = "", status: str = "") -> list[Tutor]:
-    stmt = select(Tutor)
+    stmt = select(Tutor).options(selectinload(Tutor.windows))
     if q.strip():
         like = f"%{q.strip()}%"
         stmt = stmt.where(or_(Tutor.name.ilike(like), Tutor.subjects.ilike(like)))
@@ -1820,18 +1916,27 @@ def bookable_tutors(db: OrmSession) -> list[Tutor]:
     return list(db.scalars(select(Tutor).where(Tutor.status == "ACTIVE").order_by(Tutor.name)))
 
 
-def validate_tutor_form(name: str, subjects: str) -> tuple[dict, list[str]]:
+def validate_tutor_form(name: str, phone: str, subjects: str) -> tuple[dict, list[str]]:
     data: dict = {}
     errors: list[str] = []
 
     name = name.strip()
     if not name:
         errors.append("Tutor name is required.")
+    elif len(name) > 100:
+        errors.append("Tutor name must be 100 characters or fewer.")
     data["name"] = name
+
+    phone = phone.strip()
+    if len(phone) > 20:
+        errors.append("Phone must be 20 characters or fewer.")
+    data["phone"] = phone
 
     subjects = subjects.strip()
     if not subjects:
         errors.append("Subjects are required.")
+    elif len(subjects) > 200:
+        errors.append("Subjects must be 200 characters or fewer.")
     data["subjects"] = subjects
 
     return data, errors
@@ -1875,6 +1980,10 @@ from app.templating import flash, render
 router = APIRouter(prefix="/tutors", tags=["tutors"])
 
 
+def _form(name: str, phone: str, subjects: str) -> dict:
+    return {"name": name, "phone": phone, "subjects": subjects}
+
+
 @router.get("")
 def list_view(request: Request, q: str = "", status: str = "",
               user: AppUser = Depends(require_admin), db: OrmSession = Depends(get_db)):
@@ -1893,12 +2002,13 @@ def new_form(request: Request, user: AppUser = Depends(require_admin)):
 @router.post("/new")
 def create(request: Request, name: str = Form(""), phone: str = Form(""), subjects: str = Form(""),
            user: AppUser = Depends(require_admin), db: OrmSession = Depends(get_db)):
-    data, errors = tutor_service.validate_tutor_form(name, subjects)
-    form = {"name": name, "phone": phone, "subjects": subjects}
+    data, errors = tutor_service.validate_tutor_form(name, phone, subjects)
+    form = _form(name, phone, subjects)
     if errors:
         return render(request, "tutors/form.html",
                       {"tutor": None, "form": form, "errors": errors}, status_code=400)
-    tutor = tutor_service.create_tutor(db, name=data["name"], phone=phone, subjects=data["subjects"])
+    tutor = tutor_service.create_tutor(
+        db, name=data["name"], phone=data["phone"], subjects=data["subjects"])
     flash(request, f"Tutor {tutor.name} added.")
     return RedirectResponse("/tutors", status_code=303)
 
@@ -1907,7 +2017,7 @@ def create(request: Request, name: str = Form(""), phone: str = Form(""), subjec
 def edit_form(tutor_id: int, request: Request, user: AppUser = Depends(require_admin),
               db: OrmSession = Depends(get_db)):
     tutor = get_or_404(db, Tutor, tutor_id, "Tutor")
-    form = {"name": tutor.name, "phone": tutor.phone or "", "subjects": tutor.subjects}
+    form = _form(tutor.name, tutor.phone or "", tutor.subjects)
     return render(request, "tutors/form.html", {"tutor": tutor, "form": form, "errors": []})
 
 
@@ -1916,22 +2026,23 @@ def edit(tutor_id: int, request: Request, name: str = Form(""), phone: str = For
          subjects: str = Form(""), user: AppUser = Depends(require_admin),
          db: OrmSession = Depends(get_db)):
     tutor = get_or_404(db, Tutor, tutor_id, "Tutor")
-    data, errors = tutor_service.validate_tutor_form(name, subjects)
-    form = {"name": name, "phone": phone, "subjects": subjects}
+    data, errors = tutor_service.validate_tutor_form(name, phone, subjects)
+    form = _form(name, phone, subjects)
     if errors:
         return render(request, "tutors/form.html",
                       {"tutor": tutor, "form": form, "errors": errors}, status_code=400)
-    tutor_service.update_tutor(db, tutor, name=data["name"], phone=phone, subjects=data["subjects"])
+    tutor_service.update_tutor(
+        db, tutor, name=data["name"], phone=data["phone"], subjects=data["subjects"])
     flash(request, f"Tutor {tutor.name} updated.")
     return RedirectResponse("/tutors", status_code=303)
 
 
 @router.post("/{tutor_id}/status")
-def set_status(tutor_id: int, request: Request, status: str = Form(...),
+def set_status(tutor_id: int, request: Request, status: str = Form(""),
                user: AppUser = Depends(require_admin), db: OrmSession = Depends(get_db)):
+    tutor = get_or_404(db, Tutor, tutor_id, "Tutor")
     if status not in ("ACTIVE", "INACTIVE"):
         raise HTTPException(status_code=400, detail="Invalid status")
-    tutor = get_or_404(db, Tutor, tutor_id, "Tutor")
     tutor_service.set_status(db, tutor, status)
     flash(request, f"Tutor {tutor.name} is now {status.lower()}.")
     return RedirectResponse("/tutors", status_code=303)
@@ -1965,7 +2076,9 @@ def set_status(tutor_id: int, request: Request, status: str = Form(...),
 </form>
 {% if tutors %}
 <table>
-  <thead><tr><th>Name</th><th>Subjects</th><th>Phone</th><th>Availability</th><th>Status</th><th></th></tr></thead>
+  <thead>
+    <tr><th scope="col">Name</th><th scope="col">Subjects</th><th scope="col">Phone</th><th scope="col">Availability</th><th scope="col">Status</th><th scope="col"></th></tr>
+  </thead>
   <tbody>
   {% for t in tutors %}
     <tr>
@@ -2000,7 +2113,7 @@ def set_status(tutor_id: int, request: Request, status: str = Form(...),
 <section class="card" style="max-width: 560px;">
   <h1>{{ 'Edit tutor' if tutor else 'Add tutor' }}</h1>
   {% if errors %}
-    <div class="errors">
+    <div class="errors" role="alert">
       <strong>Please fix the following:</strong>
       <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
     </div>
@@ -2008,12 +2121,12 @@ def set_status(tutor_id: int, request: Request, status: str = Form(...),
   <form method="post" action="{{ ('/tutors/' ~ tutor.id ~ '/edit') if tutor else '/tutors/new' }}">
     <div class="field">
       <label for="name">Tutor name *</label>
-      <input id="name" name="name" value="{{ form.get('name', '') }}">
+      <input id="name" name="name" value="{{ form.get('name', '') }}" required>
     </div>
     <div class="field">
       <label for="subjects">Subjects taught *</label>
       <input id="subjects" name="subjects" value="{{ form.get('subjects', '') }}"
-             placeholder="Physics 10-12, Chemistry 10-12">
+             placeholder="Physics 10-12, Chemistry 10-12" required>
     </div>
     <div class="field">
       <label for="phone">Phone</label>
@@ -2042,7 +2155,7 @@ app.include_router(tutors.router)
 uv run pytest tests/test_tutors.py -q
 ```
 
-Expected: `7 passed`。
+Expected: `17 passed`。
 
 - [ ] **Step 9: 手工验证**
 
