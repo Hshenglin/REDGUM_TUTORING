@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Schedule — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Schedule</h1>
+  <div class="filters">
+    <a class="button {% if view == 'day' %}primary{% endif %}"
+       href="/schedule?view=day&date={{ anchor_iso }}">Day</a>
+    <a class="button {% if view == 'week' %}primary{% endif %}"
+       href="/schedule?view=week&date={{ anchor_iso }}">Week</a>
+  </div>
+</div>
+<form method="get" action="/schedule" class="filters card">
+  <input type="hidden" name="view" value="{{ view }}">
+  <div class="field" style="margin:0">
+    <label for="date">Date</label>
+    <input type="date" id="date" name="date" value="{{ anchor_iso }}">
+  </div>
+  <button type="submit">Show</button>
+</form>
+{% for day, day_sessions in days %}
+  <section class="card">
+    <h2>{{ day | date_long }}</h2>
+    {% if day_sessions %}
+      <table>
+        <thead><tr><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Student</th><th scope="col">Tutor</th><th scope="col">Subject</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+        {% for s in day_sessions %}
+          <tr>
+            <td>{{ s.start_time | time12 }}</td>
+            <td>{{ s.length_minutes }} min</td>
+            <td>{{ s.student.name }}</td>
+            <td>{{ s.tutor.name }}</td>
+            <td>{{ s.subject }}</td>
+            <td><span class="status status-{{ s.status }}">{{ s.status.title() }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No sessions.</p>
+    {% endif %}
+  </section>
+{% endfor %}
+{% endblock %}

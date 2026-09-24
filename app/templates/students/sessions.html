@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ student.name }} — sessions — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>{{ student.name }} — sessions</h1>
+  <a class="button" href="/students">Back to students</a>
+</div>
+<section class="card">
+  <h2>Upcoming</h2>
+  {% if future %}
+    <table>
+      <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Tutor</th><th scope="col">Subject</th><th scope="col">Status</th></tr></thead>
+      <tbody>
+      {% for s in future %}
+        <tr>
+          <td>{{ s.session_date | date_long }}</td>
+          <td>{{ s.start_time | time12 }}</td>
+          <td>{{ s.length_minutes }} min</td>
+          <td>{{ s.tutor.name }}</td>
+          <td>{{ s.subject }}</td>
+          <td><span class="status status-{{ s.status }}">{{ s.status.title() }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No upcoming sessions.</p>
+  {% endif %}
+</section>
+<section class="card">
+  <h2>Past</h2>
+  {% if past %}
+    <table>
+      <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Tutor</th><th scope="col">Subject</th><th scope="col">Status</th></tr></thead>
+      <tbody>
+      {% for s in past %}
+        <tr>
+          <td>{{ s.session_date | date_long }}</td>
+          <td>{{ s.start_time | time12 }}</td>
+          <td>{{ s.length_minutes }} min</td>
+          <td>{{ s.tutor.name }}</td>
+          <td>{{ s.subject }}</td>
+          <td><span class="status status-{{ s.status }}">{{ s.status.title() }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No past sessions.</p>
+  {% endif %}
+</section>
+{% endblock %}
