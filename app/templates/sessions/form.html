@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Book session — Redgum Tutoring{% endblock %}
+{% block content %}
+<section class="card" style="max-width: 560px;">
+  <h1>Book session</h1>
+  {% if errors %}
+    <div class="errors" role="alert">
+      <strong>Please fix the following:</strong>
+      <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post" action="/sessions/new">
+    <div class="field">
+      <label for="student_id">Student *</label>
+      <select id="student_id" name="student_id" required>
+        <option value="">Choose…</option>
+        {% for s in students %}
+          <option value="{{ s.id }}" {% if form.get('student_id') == s.id | string %}selected{% endif %}>
+            {{ s.name }} (Year {{ s.year_level }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="tutor_id">Tutor *</label>
+      <select id="tutor_id" name="tutor_id" required>
+        <option value="">Choose…</option>
+        {% for t in tutors %}
+          <option value="{{ t.id }}" {% if form.get('tutor_id') == t.id | string %}selected{% endif %}>
+            {{ t.name }} — {{ t.subjects }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="subject">Subject *</label>
+      <input id="subject" name="subject" value="{{ form.get('subject', '') }}" placeholder="Physics" required>
+    </div>
+    <div class="field">
+      <label for="session_date">Date *</label>
+      <input type="date" id="session_date" name="session_date" value="{{ form.get('session_date', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="start_time">Start time *</label>
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
+      <div class="hint">The session must fit entirely inside one of the tutor's availability windows for that day.</div>
+    </div>
+    <div class="field">
+      <label for="length_minutes">Length *</label>
+      <select id="length_minutes" name="length_minutes" required>
+        <option value="60" {% if form.get('length_minutes', '60') == '60' %}selected{% endif %}>60 minutes</option>
+        <option value="90" {% if form.get('length_minutes') == '90' %}selected{% endif %}>90 minutes</option>
+      </select>
+    </div>
+    <button type="submit" class="primary">Book session</button>
+    <a class="button" href="/sessions">Cancel</a>
+  </form>
+</section>
+{% endblock %}
