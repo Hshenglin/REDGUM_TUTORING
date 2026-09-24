@@ -8,7 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import COOKIE_SECURE, SECRET_KEY, SESSION_MAX_AGE_SECONDS
 from app.db import init_db
-from app.routers import auth, students, views
+from app.routers import auth, students, tutors, views
 from app.security import RedirectToLogin
 from app.templating import render
 
@@ -33,6 +33,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(auth.router)
 app.include_router(students.router)
+app.include_router(tutors.router)
 app.include_router(views.router)
 
 
