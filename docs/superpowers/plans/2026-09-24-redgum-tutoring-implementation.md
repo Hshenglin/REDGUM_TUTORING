@@ -12,6 +12,25 @@
 
 ---
 
+## 分工与留白
+
+本计划描述团队的**目标状态**:下列能力已作为 net-new 工作分派给两组同学,在对应故事分支的基线上实现并自行补测试。当前仓库(截至 `story/10-delivery`)刻意不包含它们,以保证各组独立开发。
+
+**Group A(故事 03 / 04 / 05):**
+
+- **A1** — 学生与导师字段长度校验:`app/services/students.py`、`app/services/tutors.py` 中的 `len(...) > N` 检查、错误文案及其测试。
+- **A2** — 学生按家庭联系人搜索:`list_students` 在姓名之外同时匹配 `contact_name`,及其测试。
+- **A3** — 导师按科目搜索:`list_tutors` 在姓名之外同时匹配 `subjects`,及其测试。
+- **A4** — 可用时段去重:`window_exists()` 及添加/编辑两处的重复校验,及其测试。
+- **A5** — 可用时段编辑页:GET/POST `/availability/{window_id}/edit` 路由、`tutors/availability_edit.html` 模板、列表页 Edit 链接,及 `test_edit_window`。
+
+**Group B(故事 08):**
+
+- **B1** — 课表按导师筛选:`/schedule` 的 `tutor_id` 查询参数、`schedule.html` 的导师下拉框与链接参数,及 `test_schedule_can_be_filtered_by_tutor`。
+- **B2** — 学生列表的 Sessions 链接:`app/templates/students/list.html`。
+
+---
+
 ## 0. 执行约定
 
 **环境(本机已验证):** 系统 Python 3.9 太旧;使用 `uv` 安装的 Python 3.12 建虚拟环境。
@@ -4254,10 +4273,11 @@ docs/              design spec, implementation plan, handover, Jira backlog
 
 Environment variables (all optional, sensible defaults for local use):
 
-| Variable              | Default                          | Purpose                       |
-|-----------------------|----------------------------------|-------------------------------|
-| `REDGUM_SECRET_KEY`   | `dev-secret-change-me`           | Session cookie signing key    |
-| `REDGUM_DATABASE_URL` | `sqlite:///./redgum.db`          | SQLAlchemy database URL       |
+| Variable                | Default                        | Purpose                                                    |
+|-------------------------|--------------------------------|------------------------------------------------------------|
+| `REDGUM_SECRET_KEY`     | `dev-secret-change-me`         | Session cookie signing key                                 |
+| `REDGUM_DATABASE_URL`   | `sqlite:///./redgum.db`        | SQLAlchemy database URL                                    |
+| `REDGUM_COOKIE_SECURE`  | unset (off)                    | Set to `1` or `true` to add the `Secure` flag to the cookie (HTTPS) |
 
 ## More documentation
 
@@ -4357,12 +4377,14 @@ Open <http://localhost:8000>. Tests: `pytest`. No database, Node or Docker insta
 |----------|---------|---------|
 | `REDGUM_SECRET_KEY` | `dev-secret-change-me` | Session cookie signing key — must be set for any real use |
 | `REDGUM_DATABASE_URL` | `sqlite:///./redgum.db` | Database location |
+| `REDGUM_COOKIE_SECURE` | unset (off) | Set to `1` or `true` to add the `Secure` flag to the session cookie (HTTPS deployments) |
 
 - Sample `.env`-style values (illustrative):
 
 ```bash
 export REDGUM_SECRET_KEY="change-me-to-a-long-random-string"
 export REDGUM_DATABASE_URL="sqlite:///./redgum.db"
+# export REDGUM_COOKIE_SECURE="true"   # only when serving over HTTPS
 ```
 
 - Sample data: seven students, four tutors (one deactivated), their availability windows, the
