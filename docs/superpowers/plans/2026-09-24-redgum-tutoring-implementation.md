@@ -2798,14 +2798,26 @@ def test_date_maps_to_the_right_weekday():
     with pytest.raises(DomainError) as exc:
         validate_slot(tutor, WEDNESDAY, time(16, 0), 60)
     assert "no availability on Wednesday" in exc.value.message
+
+
+def test_session_crossing_midnight_is_refused():
+    tutor = make_tutor(("THURSDAY", time(22, 0), time(23, 59)))
+    with pytest.raises(DomainError) as exc:
+        validate_slot(tutor, date(2026, 8, 13), time(23, 30), 60)
+    assert "past midnight" in exc.value.message
+
+
+def test_session_ending_at_the_last_minute_of_the_day_is_allowed():
+    tutor = make_tutor(("THURSDAY", time(22, 0), time(23, 59)))
+    validate_slot(tutor, date(2026, 8, 13), time(22, 59), 60)
 ```
 
 - [ ] **Step 3: 写排课集成的失败测试 `tests/test_sessions.py`**
 
 ```python
-from datetime import time
+from datetime import date, time
 
-from app.models import Session, Tutor
+from app.models import Session
 
 
 def test_book_a_session_inside_availability(admin_client, tutor_record, make_student, db_session):
@@ -2873,16 +2885,66 @@ def test_required_fields_are_reported(admin_client, db_session):
     assert db_session.query(Session).count() == 0
 
 
+def test_subject_longer_than_100_characters_is_rejected(admin_client, tutor_record, make_student, db_session):
+    student = make_student()
+    r = admin_client.post("/sessions/new", data={
+        "student_id": str(student.id), "tutor_id": str(tutor_record.id), "subject": "x" * 101,
+        "session_date": "2026-08-11", "start_time": "16:00", "length_minutes": "60",
+    })
+    assert r.status_code == 400
+    assert "Subject must be 100 characters or fewer." in r.text
+    assert db_session.query(Session).count() == 0
+
+
 def test_booked_session_appears_in_the_list(admin_client, tutor_record, make_student):
     student = make_student()
     admin_client.post("/sessions/new", data={
-        "student_id": str(student.id), "tutor_id": str(tutor_record.id), "subject": "Physics",
+        "student_id": str(student.id), "tutor_id": str(tutor_record.id), "subject": "Quantum Mechanics",
         "session_date": "2026-08-11", "start_time": "16:00", "length_minutes": "60",
     })
     r = admin_client.get("/sessions")
-    assert "Ella Nguyen" in r.text
-    assert "Tomás Ferreira" in r.text
+    assert "Quantum Mechanics" in r.text
+    assert "4:00 pm" in r.text
+    assert "60 min" in r.text
+    assert "No sessions match." not in r.text
+
+
+def test_list_filters_by_tutor_student_date_and_status(admin_client, tutor_record, make_student, make_session, db_session):
+    ella = make_student(name="Ella Nguyen")
+    kai = make_student(name="Kai Lombardo")
+    make_session(ella, tutor_record, session_date=date(2026, 8, 11), start_time=time(15, 30),
+                 subject="Physics")
+    make_session(kai, tutor_record, session_date=date(2026, 8, 13), start_time=time(16, 0),
+                 subject="Chemistry", status="CANCELLED")
+
+    r = admin_client.get("/sessions?tutor_id=%d" % tutor_record.id)
+    assert "Physics" in r.text and "Chemistry" in r.text
+
+    r = admin_client.get("/sessions?student_id=%d" % ella.id)
+    assert "Physics" in r.text and "Chemistry" not in r.text
+
+    r = admin_client.get("/sessions?date_from=2026-08-12&date_to=2026-08-14")
+    assert "Chemistry" in r.text and "Physics" not in r.text
+
+    r = admin_client.get("/sessions?status=CANCELLED")
+    assert "Chemistry" in r.text and "Physics" not in r.text
+
+
+def test_malformed_filters_are_ignored_rather_than_erroring(admin_client, tutor_record, make_student, make_session):
+    student = make_student()
+    make_session(student, tutor_record, subject="Physics")
+
+    r = admin_client.get("/sessions?date_from=garbage&date_to=2026-99-99&tutor_id=abc&student_id=-1&status=BOGUS")
+    assert r.status_code == 200
     assert "Physics" in r.text
+
+
+def test_inactive_students_sessions_are_still_listed(admin_client, tutor_record, make_student, make_session, db_session):
+    student = make_student(status="INACTIVE")
+    make_session(student, tutor_record, subject="Legacy Physics")
+
+    r = admin_client.get("/sessions")
+    assert "Legacy Physics" in r.text
 
 
 def test_tutor_cannot_book_sessions(tutor_client):
@@ -2904,16 +2966,12 @@ Expected: 失败(`app.services.sessions` 不存在 → 导入错误;HTTP 404)。
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session as OrmSession
+from sqlalchemy.orm import Session as OrmSession, selectinload
 
 from app.errors import DomainError
 from app.formatting import fmt_time
 from app.models import DAY_NAMES, SESSION_LENGTHS, SESSION_STATUSES, Session, Student, Tutor
-
-
-def session_end_time(start_time: time, length_minutes: int) -> time:
-    anchor = datetime(2000, 1, 1, start_time.hour, start_time.minute)
-    return (anchor + timedelta(minutes=length_minutes)).time()
+from app.validation import parse_date, parse_time
 
 
 def validate_slot(tutor: Tutor, session_date: date, start_time: time, length_minutes: int) -> None:
@@ -2926,7 +2984,11 @@ def validate_slot(tutor: Tutor, session_date: date, start_time: time, length_min
     windows = [w for w in tutor.windows if w.day_of_week == day]
     if not windows:
         raise DomainError(f"{tutor.name} has no availability on {day.title()}.")
-    end_time = session_end_time(start_time, length_minutes)
+    end_moment = datetime.combine(session_date, start_time) + timedelta(minutes=length_minutes)
+    if end_moment.date() != session_date:
+        raise DomainError(
+            f"A {length_minutes}-minute session starting at {fmt_time(start_time)} would run past midnight.")
+    end_time = end_moment.time()
     for window in windows:
         if window.start_time <= start_time and end_time <= window.end_time:
             return
@@ -2936,6 +2998,52 @@ def validate_slot(tutor: Tutor, session_date: date, start_time: time, length_min
         f"{tutor.name} is only available on {day.title()} {listed}; "
         f"a {length_minutes}-minute session starting at {fmt_time(start_time)} would not fit."
     )
+
+
+def validate_session_form(db: OrmSession, student_id: str, tutor_id: str, subject: str,
+                          session_date: str, start_time: str,
+                          length_minutes: str) -> tuple[dict, list[str]]:
+    data: dict = {}
+    errors: list[str] = []
+
+    student = db.get(Student, int(student_id)) if student_id.isdigit() else None
+    if student is None:
+        errors.append("Choose a student.")
+    else:
+        data["student"] = student
+
+    tutor = db.get(Tutor, int(tutor_id)) if tutor_id.isdigit() else None
+    if tutor is None:
+        errors.append("Choose a tutor.")
+    else:
+        data["tutor"] = tutor
+
+    subject = subject.strip()
+    if not subject:
+        errors.append("Subject is required.")
+    elif len(subject) > 100:
+        errors.append("Subject must be 100 characters or fewer.")
+    data["subject"] = subject
+
+    parsed_date = parse_date(session_date)
+    if parsed_date is None:
+        errors.append("Date must look like 2026-08-11.")
+    else:
+        data["session_date"] = parsed_date
+
+    parsed_start = parse_time(start_time)
+    if parsed_start is None:
+        errors.append("Start time must look like 15:30.")
+    else:
+        data["start_time"] = parsed_start
+
+    length = int(length_minutes) if length_minutes.isdigit() else None
+    if length not in SESSION_LENGTHS:
+        errors.append("Length must be 60 or 90 minutes.")
+    else:
+        data["length_minutes"] = length
+
+    return data, errors
 
 
 def book_session(db: OrmSession, *, student: Student, tutor: Tutor, subject: str, session_date: date,
@@ -2954,7 +3062,7 @@ def book_session(db: OrmSession, *, student: Student, tutor: Tutor, subject: str
 def list_sessions(db: OrmSession, *, date_from: date | None = None, date_to: date | None = None,
                   tutor_id: int | None = None, student_id: int | None = None,
                   status: str = "") -> list[Session]:
-    stmt = select(Session)
+    stmt = select(Session).options(selectinload(Session.student), selectinload(Session.tutor))
     if date_from is not None:
         stmt = stmt.where(Session.session_date >= date_from)
     if date_to is not None:
@@ -2977,20 +3085,19 @@ from sqlalchemy.orm import Session as OrmSession
 
 from app.db import get_db
 from app.errors import DomainError
-from app.models import AppUser, SESSION_LENGTHS, Student, Tutor
+from app.models import AppUser
 from app.security import require_admin
 from app.services import sessions as session_service
 from app.services import students as student_service
 from app.services import tutors as tutor_service
 from app.templating import flash, render
-from app.validation import parse_date, parse_time
+from app.validation import parse_date
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
-def _form_context(db: OrmSession, session, form: dict, errors: list[str]) -> dict:
+def _form_context(db: OrmSession, form: dict, errors: list[str]) -> dict:
     return {
-        "session": session,
         "form": form,
         "errors": errors,
         "students": student_service.list_students(db, status="ACTIVE"),
@@ -3022,7 +3129,7 @@ def list_view(request: Request, date_from: str = "", date_to: str = "", tutor_id
 @router.get("/new")
 def new_form(request: Request, user: AppUser = Depends(require_admin),
              db: OrmSession = Depends(get_db)):
-    return render(request, "sessions/form.html", _form_context(db, None, {"length_minutes": "60"}, []))
+    return render(request, "sessions/form.html", _form_context(db, {"length_minutes": "60"}, []))
 
 
 @router.post("/new")
@@ -3032,41 +3139,15 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
            db: OrmSession = Depends(get_db)):
     form = {"student_id": student_id, "tutor_id": tutor_id, "subject": subject,
             "session_date": session_date, "start_time": start_time, "length_minutes": length_minutes}
-    errors: list[str] = []
-
-    student = db.get(Student, int(student_id)) if student_id.isdigit() else None
-    if student is None:
-        errors.append("Choose a student.")
-    tutor = db.get(Tutor, int(tutor_id)) if tutor_id.isdigit() else None
-    if tutor is None:
-        errors.append("Choose a tutor.")
-
-    subject = subject.strip()
-    if not subject:
-        errors.append("Subject is required.")
-
-    parsed_date = parse_date(session_date)
-    if parsed_date is None:
-        errors.append("Date must look like 2026-08-11.")
-
-    parsed_start = parse_time(start_time)
-    if parsed_start is None:
-        errors.append("Start time must look like 15:30.")
-
-    length = int(length_minutes) if length_minutes.isdigit() else None
-    if length not in SESSION_LENGTHS:
-        errors.append("Length must be 60 or 90 minutes.")
-
+    data, errors = session_service.validate_session_form(
+        db, student_id, tutor_id, subject, session_date, start_time, length_minutes)
     if not errors:
         try:
-            session_service.book_session(db, student=student, tutor=tutor, subject=subject,
-                                         session_date=parsed_date, start_time=parsed_start,
-                                         length_minutes=length)
+            session_service.book_session(db, **data)
         except DomainError as exc:
             errors.append(exc.message)
-
     if errors:
-        return render(request, "sessions/form.html", _form_context(db, None, form, errors),
+        return render(request, "sessions/form.html", _form_context(db, form, errors),
                       status_code=400)
     flash(request, "Session booked.")
     return RedirectResponse("/sessions", status_code=303)
@@ -3075,7 +3156,6 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
 - [ ] **Step 7: 写 `app/templates/sessions/list.html` 与 `app/templates/sessions/form.html`**
 
 ```html
-<!-- app/templates/sessions/list.html -->
 {% extends "base.html" %}
 {% block title %}Sessions — Redgum Tutoring{% endblock %}
 {% block content %}
@@ -3124,7 +3204,7 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
 {% if sessions %}
 <table>
   <thead>
-    <tr><th>Date</th><th>Time</th><th>Length</th><th>Student</th><th>Tutor</th><th>Subject</th><th>Status</th><th></th></tr>
+    <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Student</th><th scope="col">Tutor</th><th scope="col">Subject</th><th scope="col">Status</th><th scope="col"></th></tr>
   </thead>
   <tbody>
   {% for s in sessions %}
@@ -3163,14 +3243,13 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
 ```
 
 ```html
-<!-- app/templates/sessions/form.html -->
 {% extends "base.html" %}
 {% block title %}Book session — Redgum Tutoring{% endblock %}
 {% block content %}
 <section class="card" style="max-width: 560px;">
   <h1>Book session</h1>
   {% if errors %}
-    <div class="errors">
+    <div class="errors" role="alert">
       <strong>Please fix the following:</strong>
       <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
     </div>
@@ -3178,7 +3257,7 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
   <form method="post" action="/sessions/new">
     <div class="field">
       <label for="student_id">Student *</label>
-      <select id="student_id" name="student_id">
+      <select id="student_id" name="student_id" required>
         <option value="">Choose…</option>
         {% for s in students %}
           <option value="{{ s.id }}" {% if form.get('student_id') == s.id | string %}selected{% endif %}>
@@ -3189,7 +3268,7 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
     </div>
     <div class="field">
       <label for="tutor_id">Tutor *</label>
-      <select id="tutor_id" name="tutor_id">
+      <select id="tutor_id" name="tutor_id" required>
         <option value="">Choose…</option>
         {% for t in tutors %}
           <option value="{{ t.id }}" {% if form.get('tutor_id') == t.id | string %}selected{% endif %}>
@@ -3200,20 +3279,20 @@ def create(request: Request, student_id: str = Form(""), tutor_id: str = Form(""
     </div>
     <div class="field">
       <label for="subject">Subject *</label>
-      <input id="subject" name="subject" value="{{ form.get('subject', '') }}" placeholder="Physics">
+      <input id="subject" name="subject" value="{{ form.get('subject', '') }}" placeholder="Physics" required>
     </div>
     <div class="field">
       <label for="session_date">Date *</label>
-      <input type="date" id="session_date" name="session_date" value="{{ form.get('session_date', '') }}">
+      <input type="date" id="session_date" name="session_date" value="{{ form.get('session_date', '') }}" required>
     </div>
     <div class="field">
       <label for="start_time">Start time *</label>
-      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}">
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
       <div class="hint">The session must fit entirely inside one of the tutor's availability windows for that day.</div>
     </div>
     <div class="field">
       <label for="length_minutes">Length *</label>
-      <select id="length_minutes" name="length_minutes">
+      <select id="length_minutes" name="length_minutes" required>
         <option value="60" {% if form.get('length_minutes', '60') == '60' %}selected{% endif %}>60 minutes</option>
         <option value="90" {% if form.get('length_minutes') == '90' %}selected{% endif %}>90 minutes</option>
       </select>
@@ -3241,7 +3320,7 @@ app.include_router(sessions.router)
 uv run pytest tests/test_availability_rule.py tests/test_sessions.py -q
 ```
 
-Expected: `10 passed`(规则)+ `7 passed`(排课)。
+Expected: `12 passed`(规则)+ `11 passed`(排课,含 subject 长度上限与筛选覆盖)。
 
 - [ ] **Step 10: 手工验证核心规则**
 
@@ -4265,6 +4344,9 @@ Open <http://localhost:8000>. Tests: `pytest`. No database, Node or Docker insta
 9. The frontend has no automated tests; behaviour is covered end-to-end by the pytest suite.
 10. Booking a session in the past is not blocked — the brief does not ask for it, and the
     schedule doubles as a record of what happened.
+11. Sessions cannot run past midnight (nor end exactly at midnight): availability windows and
+    sessions are compared as wall-clock times within a single day. The centre closes at 8pm,
+    so this is theoretical.
 
 ## 5. Credentials, configuration and environment
 
