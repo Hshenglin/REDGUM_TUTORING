@@ -1,7 +1,11 @@
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
+from app.formatting import fmt_date, fmt_time
+
 templates = Jinja2Templates(directory="app/templates")
+templates.env.filters["time12"] = fmt_time
+templates.env.filters["date_long"] = fmt_date
 
 
 def flash(request: Request, message: str, category: str = "ok") -> None:
