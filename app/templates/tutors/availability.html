@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Availability — {{ tutor.name }} — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Availability — {{ tutor.name }}</h1>
+  <a class="button" href="/tutors">Back to tutors</a>
+</div>
+{% if errors %}
+    <div class="errors" role="alert">
+      <strong>Please fix the following:</strong>
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+<section class="card">
+  <h2>Current windows</h2>
+  {% if windows %}
+  <table>
+    <thead><tr><th scope="col">Day</th><th scope="col">From</th><th scope="col">Until</th><th scope="col"></th></tr></thead>
+    <tbody>
+    {% for w in windows %}
+      <tr>
+        <td>{{ w.day_of_week.title() }}</td>
+        <td>{{ w.start_time | time12 }}</td>
+        <td>{{ w.end_time | time12 }}</td>
+        <td class="actions">
+          <form class="inline" method="post" action="/availability/{{ w.id }}/delete">
+            <button type="submit" class="danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="empty">No availability windows yet — this tutor cannot be booked.</p>
+  {% endif %}
+</section>
+<section class="card" style="max-width: 560px;">
+  <h2>Add a window</h2>
+  <form method="post" action="/tutors/{{ tutor.id }}/availability">
+    <div class="field">
+      <label for="day_of_week">Day</label>
+      <select id="day_of_week" name="day_of_week" required>
+        {% for day in ['TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] %}
+          <option value="{{ day }}" {% if form.get('day_of_week') == day %}selected{% endif %}>{{ day.title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="start_time">From</label>
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="end_time">Until</label>
+      <input type="time" id="end_time" name="end_time" value="{{ form.get('end_time', '') }}" required>
+    </div>
+    <button type="submit" class="primary">Add window</button>
+  </form>
+</section>
+{% endblock %}
