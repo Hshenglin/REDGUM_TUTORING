@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as OrmSession
@@ -6,6 +8,7 @@ from app.db import get_db
 from app.models import AppUser, Student
 from app.routers._helpers import get_or_404
 from app.security import require_admin
+from app.services import schedule as schedule_service
 from app.services import students as student_service
 from app.templating import flash, render
 
@@ -90,3 +93,12 @@ def set_status(student_id: int, request: Request, status: str = Form(""),
     student_service.set_status(db, student, status)
     flash(request, f"Student {student.name} is now {status.lower()}.")
     return RedirectResponse("/students", status_code=303)
+
+
+@router.get("/{student_id}/sessions")
+def sessions_view(student_id: int, request: Request, user: AppUser = Depends(require_admin),
+                  db: OrmSession = Depends(get_db)):
+    student = get_or_404(db, Student, student_id, "Student")
+    past, future = schedule_service.student_sessions(db, student_id, date.today())
+    return render(request, "students/sessions.html",
+                  {"student": student, "past": past, "future": future})
