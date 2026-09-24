@@ -510,9 +510,10 @@ async def redirect_to_login(request: Request, exc: RedirectToLogin):
 
 @app.exception_handler(HTTPException)
 async def http_exception(request: Request, exc: HTTPException):
-    if exc.status_code in (403, 404):
-        heading = "Not allowed" if exc.status_code == 403 else "Page not found"
-        return render(request, "error.html", {"message": exc.detail, "heading": heading},
+    if exc.status_code in (400, 403, 404):
+        headings = {400: "Invalid request", 403: "Not allowed", 404: "Page not found"}
+        return render(request, "error.html",
+                      {"message": exc.detail, "heading": headings[exc.status_code]},
                       status_code=exc.status_code)
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
 ```
@@ -1272,6 +1273,65 @@ def test_tutor_cannot_access_students(tutor_client):
 
 def test_unknown_student_edit_returns_404(admin_client):
     assert admin_client.get("/students/9999/edit").status_code == 404
+
+
+def test_over_length_name_is_rejected(admin_client, db_session):
+    r = admin_client.post("/students/new", data={
+        "name": "x" * 101, "year_level": "11", "contact_name": "Y", "contact_phone": "0400",
+    })
+    assert r.status_code == 400
+    assert "Student name must be 100 characters or fewer." in r.text
+    assert db_session.query(Student).count() == 0
+
+
+def test_edit_validation_failure_keeps_the_record(admin_client, make_student, db_session):
+    student = make_student(name="Ella Nguyen")
+    r = admin_client.post(f"/students/{student.id}/edit", data={
+        "name": "", "year_level": "12", "contact_name": "Mai Nguyen", "contact_phone": "0412 660 118",
+    })
+    assert r.status_code == 400
+    assert "Student name is required." in r.text
+    db_session.refresh(student)
+    assert student.name == "Ella Nguyen"
+    assert student.year_level == 11
+
+
+def test_invalid_status_is_rejected(admin_client, make_student, db_session):
+    student = make_student()
+    r = admin_client.post(f"/students/{student.id}/status", data={"status": "DELETED"})
+    assert r.status_code == 400
+    assert "Invalid status" in r.text
+    db_session.refresh(student)
+    assert student.status == "ACTIVE"
+
+
+def test_status_and_edit_on_unknown_student_return_404(admin_client):
+    assert admin_client.post("/students/9999/edit", data={
+        "name": "X", "year_level": "11", "contact_name": "Y", "contact_phone": "0400",
+    }).status_code == 404
+    assert admin_client.post("/students/9999/status", data={"status": "INACTIVE"}).status_code == 404
+
+
+def test_search_matches_the_family_contact_name(admin_client, make_student):
+    make_student(name="Ella Nguyen", contact_name="Mai Nguyen")
+    make_student(name="Kai Lombardo", contact_name="Gina Lombardo")
+    r = admin_client.get("/students?q=Gina")
+    assert "Kai Lombardo" in r.text
+    assert "Ella Nguyen" not in r.text
+
+
+def test_inactive_students_are_listed_by_default(admin_client, make_student):
+    make_student(name="Ruth Callaghan", status="INACTIVE")
+    r = admin_client.get("/students")
+    assert "Ruth Callaghan" in r.text
+
+
+def test_non_numeric_year_level_is_reported(admin_client, db_session):
+    r = admin_client.post("/students/new", data={
+        "name": "X", "year_level": "eleven", "contact_name": "Y", "contact_phone": "0400",
+    })
+    assert r.status_code == 400
+    assert "Year level must be a whole number between 5 and 12." in r.text
 ```
 
 - [ ] **Step 3: 运行确认失败**
@@ -1315,13 +1375,16 @@ def list_students(db: OrmSession, q: str = "", status: str = "") -> list[Student
     return list(db.scalars(stmt.order_by(Student.name)))
 
 
-def validate_student_form(name: str, year_level: str, contact_name: str, contact_phone: str) -> tuple[dict, list[str]]:
+def validate_student_form(name: str, year_level: str, school: str, contact_name: str,
+                          contact_phone: str, contact_email: str, subjects: str) -> tuple[dict, list[str]]:
     data: dict = {}
     errors: list[str] = []
 
     name = name.strip()
     if not name:
         errors.append("Student name is required.")
+    elif len(name) > 100:
+        errors.append("Student name must be 100 characters or fewer.")
     data["name"] = name
 
     year_level = year_level.strip()
@@ -1338,15 +1401,34 @@ def validate_student_form(name: str, year_level: str, contact_name: str, contact
             else:
                 data["year_level"] = year
 
+    school = school.strip()
+    if len(school) > 120:
+        errors.append("School must be 120 characters or fewer.")
+    data["school"] = school
+
     contact_name = contact_name.strip()
     if not contact_name:
         errors.append("Family contact name is required.")
+    elif len(contact_name) > 100:
+        errors.append("Family contact name must be 100 characters or fewer.")
     data["contact_name"] = contact_name
 
     contact_phone = contact_phone.strip()
     if not contact_phone:
         errors.append("Family contact phone is required.")
+    elif len(contact_phone) > 20:
+        errors.append("Family contact phone must be 20 characters or fewer.")
     data["contact_phone"] = contact_phone
+
+    contact_email = contact_email.strip()
+    if len(contact_email) > 120:
+        errors.append("Family contact email must be 120 characters or fewer.")
+    data["contact_email"] = contact_email
+
+    subjects = subjects.strip()
+    if len(subjects) > 200:
+        errors.append("Subjects must be 200 characters or fewer.")
+    data["subjects"] = subjects
 
     return data, errors
 
@@ -1424,15 +1506,16 @@ def create(request: Request, name: str = Form(""), year_level: str = Form(""), s
            contact_name: str = Form(""), contact_phone: str = Form(""), contact_email: str = Form(""),
            subjects: str = Form(""), user: AppUser = Depends(require_admin),
            db: OrmSession = Depends(get_db)):
-    data, errors = student_service.validate_student_form(name, year_level, contact_name, contact_phone)
+    data, errors = student_service.validate_student_form(
+        name, year_level, school, contact_name, contact_phone, contact_email, subjects)
     form = _form(name, year_level, school, contact_name, contact_phone, contact_email, subjects)
     if errors:
         return render(request, "students/form.html",
                       {"student": None, "form": form, "errors": errors}, status_code=400)
     student = student_service.create_student(
-        db, name=data["name"], year_level=data["year_level"], school=school,
+        db, name=data["name"], year_level=data["year_level"], school=data["school"],
         contact_name=data["contact_name"], contact_phone=data["contact_phone"],
-        contact_email=contact_email, subjects=subjects)
+        contact_email=data["contact_email"], subjects=data["subjects"])
     flash(request, f"Student {student.name} added.")
     return RedirectResponse("/students", status_code=303)
 
@@ -1452,25 +1535,26 @@ def edit(student_id: int, request: Request, name: str = Form(""), year_level: st
          contact_email: str = Form(""), subjects: str = Form(""),
          user: AppUser = Depends(require_admin), db: OrmSession = Depends(get_db)):
     student = get_or_404(db, Student, student_id, "Student")
-    data, errors = student_service.validate_student_form(name, year_level, contact_name, contact_phone)
+    data, errors = student_service.validate_student_form(
+        name, year_level, school, contact_name, contact_phone, contact_email, subjects)
     form = _form(name, year_level, school, contact_name, contact_phone, contact_email, subjects)
     if errors:
         return render(request, "students/form.html",
                       {"student": student, "form": form, "errors": errors}, status_code=400)
     student_service.update_student(
-        db, student, name=data["name"], year_level=data["year_level"], school=school,
+        db, student, name=data["name"], year_level=data["year_level"], school=data["school"],
         contact_name=data["contact_name"], contact_phone=data["contact_phone"],
-        contact_email=contact_email, subjects=subjects)
+        contact_email=data["contact_email"], subjects=data["subjects"])
     flash(request, f"Student {student.name} updated.")
     return RedirectResponse("/students", status_code=303)
 
 
 @router.post("/{student_id}/status")
-def set_status(student_id: int, request: Request, status: str = Form(...),
+def set_status(student_id: int, request: Request, status: str = Form(""),
                user: AppUser = Depends(require_admin), db: OrmSession = Depends(get_db)):
+    student = get_or_404(db, Student, student_id, "Student")
     if status not in ("ACTIVE", "INACTIVE"):
         raise HTTPException(status_code=400, detail="Invalid status")
-    student = get_or_404(db, Student, student_id, "Student")
     student_service.set_status(db, student, status)
     flash(request, f"Student {student.name} is now {status.lower()}.")
     return RedirectResponse("/students", status_code=303)
@@ -1505,7 +1589,7 @@ def set_status(student_id: int, request: Request, status: str = Form(...),
 {% if students %}
 <table>
   <thead>
-    <tr><th>Name</th><th>Year</th><th>School</th><th>Family contact</th><th>Subjects</th><th>Status</th><th></th></tr>
+    <tr><th scope="col">Name</th><th scope="col">Year</th><th scope="col">School</th><th scope="col">Family contact</th><th scope="col">Subjects</th><th scope="col">Status</th><th scope="col"></th></tr>
   </thead>
   <tbody>
   {% for s in students %}
@@ -1541,7 +1625,7 @@ def set_status(student_id: int, request: Request, status: str = Form(...),
 <section class="card" style="max-width: 560px;">
   <h1>{{ 'Edit student' if student else 'Add student' }}</h1>
   {% if errors %}
-    <div class="errors">
+    <div class="errors" role="alert">
       <strong>Please fix the following:</strong>
       <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
     </div>
@@ -1549,11 +1633,11 @@ def set_status(student_id: int, request: Request, status: str = Form(...),
   <form method="post" action="{{ ('/students/' ~ student.id ~ '/edit') if student else '/students/new' }}">
     <div class="field">
       <label for="name">Student name *</label>
-      <input id="name" name="name" value="{{ form.get('name', '') }}">
+      <input id="name" name="name" value="{{ form.get('name', '') }}" required>
     </div>
     <div class="field">
       <label for="year_level">Year level * (5–12)</label>
-      <input id="year_level" name="year_level" value="{{ form.get('year_level', '') }}">
+      <input id="year_level" name="year_level" value="{{ form.get('year_level', '') }}" required>
     </div>
     <div class="field">
       <label for="school">School</label>
@@ -1561,11 +1645,11 @@ def set_status(student_id: int, request: Request, status: str = Form(...),
     </div>
     <div class="field">
       <label for="contact_name">Family contact name *</label>
-      <input id="contact_name" name="contact_name" value="{{ form.get('contact_name', '') }}">
+      <input id="contact_name" name="contact_name" value="{{ form.get('contact_name', '') }}" required>
     </div>
     <div class="field">
       <label for="contact_phone">Family contact phone *</label>
-      <input id="contact_phone" name="contact_phone" value="{{ form.get('contact_phone', '') }}">
+      <input id="contact_phone" name="contact_phone" value="{{ form.get('contact_phone', '') }}" required>
     </div>
     <div class="field">
       <label for="contact_email">Family contact email</label>
@@ -1583,7 +1667,7 @@ def set_status(student_id: int, request: Request, status: str = Form(...),
 {% endblock %}
 ```
 
-- [ ] **Step 7: 修改 `app/main.py` 注册路由**
+- [ ] **Step 7: 修改 `app/main.py`(注册路由,并让 400 也渲染错误页)**
 
 ```python
 from app.routers import auth, students, views
@@ -1593,13 +1677,26 @@ from app.routers import auth, students, views
 app.include_router(students.router)
 ```
 
+将 `HTTPException` 处理器改为同时处理 400(供 `/students/{id}/status` 的非法状态使用):
+
+```python
+@app.exception_handler(HTTPException)
+async def http_exception(request: Request, exc: HTTPException):
+    if exc.status_code in (400, 403, 404):
+        headings = {400: "Invalid request", 403: "Not allowed", 404: "Page not found"}
+        return render(request, "error.html",
+                      {"message": exc.detail, "heading": headings[exc.status_code]},
+                      status_code=exc.status_code)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+```
+
 - [ ] **Step 8: 运行测试(应通过)**
 
 ```bash
 uv run pytest tests/test_students.py -q
 ```
 
-Expected: `9 passed`。
+Expected: `16 passed`。
 
 - [ ] **Step 9: 手工验证**
 
@@ -2279,8 +2376,8 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
   <a class="button" href="/tutors">Back to tutors</a>
 </div>
 {% if errors %}
-  <div class="errors">
-    <strong>Please fix the following:</strong>
+    <div class="errors">
+      <strong>Please fix the following:</strong>
     <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
   </div>
 {% endif %}
@@ -4118,7 +4215,7 @@ git commit -m "docs(story-10): README, handover document and Jira backlog"
 
 **2. 占位符扫描:** 无 TBD/TODO;所有代码步骤含完整代码;重复性文件(模板、测试)均给出完整内容。
 
-**3. 类型一致性检查:** `validate_slot(tutor, session_date, start_time, length_minutes)` 在 Task 6 定义、Task 7 复用;`get_or_404(db, model, id, label)` 在 Task 5 定义、Task 6/7/8 使用;`render(request, name, context, status_code)` 全局一致;`bookable_tutors` 在 Task 4 定义、Task 6 使用;`week_start`/`week_days`/`sessions_on` 在 Task 8 内部一致;Jinja 过滤器 `time12`/`date_long` 在 Task 5 注册、Task 5–9 模板使用。
+**3. 类型一致性检查:** `validate_slot(tutor, session_date, start_time, length_minutes)` 在 Task 6 定义、Task 7 复用;`get_or_404(db, model, id, label)` 在 Task 3 定义、Task 4/5/7/8 使用;`render(request, name, context, status_code)` 全局一致;`bookable_tutors` 在 Task 4 定义、Task 6 使用;`week_start`/`week_days`/`sessions_on` 在 Task 8 内部一致;Jinja 过滤器 `time12`/`date_long` 在 Task 5 注册、Task 5–9 模板使用。
 
 
 
