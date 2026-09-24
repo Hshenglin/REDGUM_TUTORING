@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Move session — Redgum Tutoring{% endblock %}
+{% block content %}
+<section class="card" style="max-width: 560px;">
+  <h1>Move session</h1>
+  <p class="muted">
+    {{ session.student.name }} with {{ session.tutor.name }} — {{ session.subject }}
+    ({{ session.length_minutes }} minutes)
+  </p>
+  {% if errors %}
+    <div class="errors" role="alert">
+      <strong>Please fix the following:</strong>
+      <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post" action="/sessions/{{ session.id }}/edit">
+    <div class="field">
+      <label for="session_date">Date *</label>
+      <input type="date" id="session_date" name="session_date" value="{{ form.get('session_date', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="start_time">Start time *</label>
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
+      <div class="hint">The new time must fit entirely inside one of {{ session.tutor.name }}'s availability windows.</div>
+    </div>
+    <div class="field">
+      <label for="length_minutes">Length *</label>
+      <select id="length_minutes" name="length_minutes" required>
+        <option value="60" {% if form.get('length_minutes') == '60' %}selected{% endif %}>60 minutes</option>
+        <option value="90" {% if form.get('length_minutes') == '90' %}selected{% endif %}>90 minutes</option>
+      </select>
+    </div>
+    <button type="submit" class="primary">Save changes</button>
+    <a class="button" href="/sessions">Cancel</a>
+  </form>
+</section>
+{% endblock %}
