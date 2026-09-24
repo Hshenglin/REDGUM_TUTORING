@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as OrmSession
 
 from app.db import get_db
-from app.models import AppUser
+from app.models import AppUser, Tutor
 from app.security import require_admin, require_user
 from app.services import schedule as schedule_service
 from app.templating import render
@@ -42,3 +42,13 @@ def schedule(request: Request, start: str = Query("", alias="date"), view: str =
         "view": "day" if view == "day" else "week",
         "anchor_iso": anchor.isoformat(),
     })
+
+
+@router.get("/my-sessions")
+def my_sessions(request: Request, user: AppUser = Depends(require_user),
+                db: OrmSession = Depends(get_db)):
+    if user.tutor_id is None:
+        return render(request, "my_sessions.html", {"tutor": None, "sessions": []})
+    tutor = db.get(Tutor, user.tutor_id)
+    sessions = schedule_service.upcoming_for_tutor(db, tutor.id, date.today())
+    return render(request, "my_sessions.html", {"tutor": tutor, "sessions": sessions})
