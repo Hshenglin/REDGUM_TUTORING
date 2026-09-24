@@ -21,6 +21,9 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-constant-time-login")
+
+
 def current_user(request: Request, db: OrmSession = Depends(get_db)) -> AppUser | None:
     user_id = request.session.get("user_id")
     if user_id is None:
