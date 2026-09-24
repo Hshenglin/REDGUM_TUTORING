@@ -88,7 +88,7 @@ git -c user.name="boyforest" -c user.email="boyforest@users.noreply.github.com" 
 - Create: `requirements.txt`, `.gitignore`(已存在,确认覆盖 `.venv/`)、`app/__init__.py`、`app/services/__init__.py`、`app/routers/__init__.py`
 - Create: `app/config.py`, `app/db.py`, `app/models.py`, `app/templating.py`, `app/errors.py`, `app/seed.py`, `app/main.py`
 - Create: `app/templates/base.html`, `app/templates/error.html`, `app/static/style.css`
-- Create: `tests/conftest.py`, `tests/test_foundation.py`
+- Create: `tests/__init__.py`, `tests/conftest.py`, `tests/test_foundation.py`
 
 - [ ] **Step 1: 建分支与虚拟环境**
 
@@ -126,17 +126,26 @@ import os
 SECRET_KEY = os.environ.get("REDGUM_SECRET_KEY", "dev-secret-change-me")
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 12
 DATABASE_URL = os.environ.get("REDGUM_DATABASE_URL", "sqlite:///./redgum.db")
+COOKIE_SECURE = os.environ.get("REDGUM_COOKIE_SECURE", "").lower() in ("1", "true", "yes")
 ```
 
 ```python
 # app/db.py
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session as OrmSession, sessionmaker
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DATABASE_URL
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 class Base(DeclarativeBase):
@@ -164,7 +173,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Time
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, String, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -176,11 +185,12 @@ SESSION_STATUSES = ("BOOKED", "ATTENDED", "CANCELLED", "MISSED")
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Student(Base):
     __tablename__ = "student"
+    __table_args__ = (CheckConstraint("year_level BETWEEN 5 AND 12", name="ck_student_year"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
@@ -213,6 +223,7 @@ class Tutor(Base):
 
 class AvailabilityWindow(Base):
     __tablename__ = "availability_window"
+    __table_args__ = (UniqueConstraint("tutor_id", "day_of_week", "start_time", "end_time", name="uq_window"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tutor_id: Mapped[int] = mapped_column(ForeignKey("tutor.id"))
@@ -227,6 +238,7 @@ class AvailabilityWindow(Base):
 
 class Session(Base):
     __tablename__ = "session"
+    __table_args__ = (Index("ix_session_tutor_date", "tutor_id", "session_date"), Index("ix_session_student", "student_id"), CheckConstraint("length_minutes IN (60, 90)", name="ck_session_length"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("student.id"))
@@ -290,10 +302,12 @@ def render(request: Request, name: str, context: dict | None = None, status_code
     ctx = {
         "request": request,
         "current_user": getattr(request.state, "user", None),
-        "flashes": pop_flashes(request),
+        "flashes": list(request.session.get("flashes", [])),
     }
     ctx.update(context or {})
-    return templates.TemplateResponse(request, name, ctx, status_code=status_code)
+    response = templates.TemplateResponse(request, name, ctx, status_code=status_code)
+    request.session.pop("flashes", None)
+    return response
 ```
 
 - [ ] **Step 6: 写 `app/templates/base.html`、`app/templates/error.html`**
@@ -341,10 +355,10 @@ def render(request: Request, name: str, context: dict | None = None, status_code
 ```html
 <!-- app/templates/error.html -->
 {% extends "base.html" %}
-{% block title %}Not allowed — Redgum Tutoring{% endblock %}
+{% block title %}{{ heading or 'Error' }} — Redgum Tutoring{% endblock %}
 {% block content %}
   <section class="card">
-    <h1>Not allowed</h1>
+    <h1>{{ heading or 'Something went wrong' }}</h1>
     <p>{{ message }}</p>
     <p><a href="/">Back to the home page</a></p>
   </section>
@@ -457,12 +471,13 @@ button.danger { color: var(--warn-ink); }
 # app/main.py
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import SECRET_KEY, SESSION_MAX_AGE_SECONDS
+from app.config import COOKIE_SECURE, SECRET_KEY, SESSION_MAX_AGE_SECONDS
 from app.db import init_db
 from app.security import RedirectToLogin
 from app.templating import render
@@ -483,7 +498,7 @@ app.add_middleware(
     secret_key=SECRET_KEY,
     max_age=SESSION_MAX_AGE_SECONDS,
     same_site="lax",
-    https_only=False,
+    https_only=COOKIE_SECURE,
 )
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -495,9 +510,11 @@ async def redirect_to_login(request: Request, exc: RedirectToLogin):
 
 @app.exception_handler(HTTPException)
 async def http_exception(request: Request, exc: HTTPException):
-    if exc.status_code == 403:
-        return render(request, "error.html", {"message": exc.detail}, status_code=403)
-    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    if exc.status_code in (403, 404):
+        heading = "Not allowed" if exc.status_code == 403 else "Page not found"
+        return render(request, "error.html", {"message": exc.detail, "heading": heading},
+                      status_code=exc.status_code)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
 ```
 
 注意:`app/security.py`(Step 9)必须先存在,否则 `main.py` 导入失败。
@@ -557,7 +574,7 @@ def require_admin(user: AppUser = Depends(require_user)) -> AppUser:
 
 ```python
 # app/seed.py
-from datetime import date, datetime, time, timedelta
+from datetime import date, time, timedelta
 
 from app.db import SessionLocal
 from app.models import AppUser, AvailabilityWindow, Session, Student, Tutor
@@ -642,7 +659,7 @@ DIARY_WEEK = [
 def seed_if_empty() -> None:
     db = SessionLocal()
     try:
-        if db.query(Student).count() > 0:
+        if db.query(Student).count() > 0 or db.query(AppUser).count() > 0:
             return
 
         tutors = {}
@@ -652,6 +669,7 @@ def seed_if_empty() -> None:
                 tutor.windows.append(AvailabilityWindow(day_of_week=day, start_time=start, end_time=end))
             db.add(tutor)
             tutors[spec["name"].split()[0]] = tutor
+            tutors[spec["name"].split()[-1]] = tutor
         db.flush()
 
         students = {}
@@ -707,6 +725,8 @@ def seed_if_empty() -> None:
         db.close()
 ```
 
+注意:导师字典同时以名字和姓氏为键——`AppUser` 用名字(`Helen`/`Tomás`),课表数据用姓氏(`Ferreira`/`Vasquez`)。
+
 - [ ] **Step 11: 写 `tests/conftest.py` 与 `tests/test_foundation.py`**
 
 ```python
@@ -738,6 +758,12 @@ def db_session():
     finally:
         session.close()
         engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _clear_overrides_after_test():
+    yield
+    app.dependency_overrides.clear()
 
 
 def _make_client(db_session):
@@ -789,7 +815,8 @@ def tutor_user(db_session, tutor_record):
 @pytest.fixture()
 def admin_client(db_session, admin):
     c = _make_client(db_session)
-    c.post("/login", data={"username": "deb", "password": DEMO_PASSWORD})
+    response = c.post("/login", data={"username": "deb", "password": DEMO_PASSWORD}, follow_redirects=False)
+    assert response.status_code == 303
     yield c
     app.dependency_overrides.clear()
 
@@ -797,7 +824,8 @@ def admin_client(db_session, admin):
 @pytest.fixture()
 def tutor_client(db_session, tutor_user):
     c = _make_client(db_session)
-    c.post("/login", data={"username": "tomas", "password": DEMO_PASSWORD})
+    response = c.post("/login", data={"username": "tomas", "password": DEMO_PASSWORD}, follow_redirects=False)
+    assert response.status_code == 303
     yield c
     app.dependency_overrides.clear()
 
@@ -839,11 +867,12 @@ def make_session(db_session):
 from datetime import date, time
 ```
 
+另外需创建空的 `tests/__init__.py`,使 pytest 将仓库根加入 `sys.path`(否则 `uv run pytest` 无法导入 `app`)。
+
 ```python
 # tests/test_foundation.py
 from sqlalchemy import inspect
 
-from app.db import Base, engine
 from app.models import Student
 
 
@@ -856,6 +885,7 @@ def test_student_round_trip(db_session):
     student = Student(name="Ella Nguyen", year_level=11, contact_name="Mai Nguyen", contact_phone="0412 660 118")
     db_session.add(student)
     db_session.commit()
+    db_session.expire_all()
 
     loaded = db_session.get(Student, student.id)
     assert loaded.name == "Ella Nguyen"

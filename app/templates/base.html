@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Redgum Tutoring{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Redgum Tutoring</a>
+    {% if current_user %}
+      <nav>
+        {% if current_user.role == 'ADMIN' %}
+          <a href="/schedule">Schedule</a>
+          <a href="/sessions">Sessions</a>
+          <a href="/students">Students</a>
+          <a href="/tutors">Tutors</a>
+        {% else %}
+          <a href="/my-sessions">My sessions</a>
+        {% endif %}
+      </nav>
+      <div class="whoami">
+        <span>{{ current_user.username }} · {{ 'Administrator' if current_user.role == 'ADMIN' else 'Tutor' }}</span>
+        <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+      </div>
+    {% endif %}
+  </header>
+  <main>
+    {% for f in flashes %}
+      <div class="flash flash-{{ f.category }}">{{ f.message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

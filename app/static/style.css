@@ -1,0 +1,95 @@
+:root {
+  --ink: #1f2933;
+  --muted: #6b7280;
+  --line: #d9dee3;
+  --bg: #f7f8fa;
+  --accent: #8c2f39;
+  --accent-dark: #6f2129;
+  --ok-bg: #e7f4ea;
+  --ok-ink: #20572f;
+  --warn-bg: #fdecec;
+  --warn-ink: #8a2020;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand { font-weight: 700; color: var(--accent); text-decoration: none; }
+.topbar nav { display: flex; gap: 16px; flex: 1; }
+.topbar nav a { color: var(--ink); text-decoration: none; }
+.topbar nav a:hover { color: var(--accent); }
+.whoami { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+
+main { max-width: 1040px; margin: 24px auto; padding: 0 24px; }
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+h1 { font-size: 22px; margin: 0 0 12px; }
+h2 { font-size: 17px; margin: 24px 0 8px; }
+
+.flash { padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; }
+.flash-ok { background: var(--ok-bg); color: var(--ok-ink); }
+.flash-error { background: var(--warn-bg); color: var(--warn-ink); }
+
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+form.inline { display: inline; }
+
+button, .button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover, .button.primary:hover { background: var(--accent-dark); }
+button.link { border: none; background: none; color: var(--accent); padding: 0; }
+button.danger { color: var(--warn-ink); }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.field input, .field select { font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; width: 100%; max-width: 360px; }
+.field .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.errors { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+.errors ul { margin: 4px 0 0 18px; }
+
+.status { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eef1f4; color: var(--muted); }
+.status-ACTIVE, .status-ATTENDED { background: var(--ok-bg); color: var(--ok-ink); }
+.status-INACTIVE, .status-CANCELLED, .status-MISSED { background: var(--warn-bg); color: var(--warn-ink); }
+.status-BOOKED { background: #e8eefc; color: #24407a; }
+
+.muted { color: var(--muted); }
+.empty { color: var(--muted); padding: 12px 0; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
