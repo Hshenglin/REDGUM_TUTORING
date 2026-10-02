@@ -91,6 +91,11 @@ def test_whitespace_only_name_and_subjects_are_rejected(admin_client, db_session
     assert db_session.query(Tutor).count() == 0
 
 
+def test_search_matches_subjects(admin_client, tutor_record):
+    assert "Tomás Ferreira" in admin_client.get("/tutors?q=Physics").text
+    assert "Tomás Ferreira" not in admin_client.get("/tutors?q=Nuclear").text
+
+
 def test_reactivate_tutor(admin_client, tutor_record, db_session):
     admin_client.post(f"/tutors/{tutor_record.id}/status", data={"status": "INACTIVE"})
     db_session.refresh(tutor_record)
