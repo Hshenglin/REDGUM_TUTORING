@@ -1,5 +1,6 @@
 from datetime import time
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.models import DAY_ORDER, OPEN_DAYS, AvailabilityWindow, Tutor
@@ -58,3 +59,16 @@ def update_window(db: OrmSession, window: AvailabilityWindow, *, day_of_week: st
 def delete_window(db: OrmSession, window: AvailabilityWindow) -> None:
     db.delete(window)
     db.commit()
+
+
+def window_exists(db: OrmSession, tutor_id: int, day_of_week: str, start_time: time,
+                  end_time: time, exclude_id: int | None = None) -> bool:
+    stmt = select(AvailabilityWindow).where(
+        AvailabilityWindow.tutor_id == tutor_id,
+        AvailabilityWindow.day_of_week == day_of_week,
+        AvailabilityWindow.start_time == start_time,
+        AvailabilityWindow.end_time == end_time,
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(AvailabilityWindow.id != exclude_id)
+    return db.scalars(stmt).first() is not None
