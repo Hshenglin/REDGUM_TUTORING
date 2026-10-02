@@ -1,0 +1,86 @@
+﻿Captured from commit 33c9c61 on 2026-10-03 03:02 (local time).
+
+*   33c9c61 (HEAD -> docs/evidence-captures, tag: v0.2.0, origin/main, origin/HEAD, main) Merge pull request #15 from chore/a2-deployment-configuration
+|\  
+| * 52333b6 (origin/chore/a2-deployment-configuration, chore/a2-deployment-configuration) docs: add changelog and pytest configuration
+| * ab612b4 build: add deployment configuration and continuous integration
+* |   81f2441 Merge pull request #14 from group-a/story-05-availability
+|\ \  
+| * | c9d1c1f (origin/group-a/story-05-availability, group-a/story-05-availability) feat(story-05): reject duplicate availability windows
+| * | 63ed457 feat(story-05): edit availability windows
+| |/  
+* |   9a0b102 Merge pull request #13 from group-a/story-04-tutors
+|\ \  
+| * | 5cc7a01 (origin/group-a/story-04-tutors, group-a/story-04-tutors) feat(story-04): bound tutor field lengths
+| * | 9e9993a feat(story-04): search tutors by subject
+| |/  
+* |   7c2ac53 Merge pull request #12 from group-a/story-03-students
+|\ \  
+| * | ebe53cd (origin/group-a/story-03-students, group-a/story-03-students) feat(story-03): bound student field lengths
+| * | 141ffb3 feat(story-03): search students by family contact name
+| |/  
+* | a2f77b3 (tag: v0.1.0) Merge pull request #11 from story/10-delivery
+|\| 
+| * c53ed9e (origin/story/10-delivery) docs(story-10): record the team split and delegated work
+| * 3906425 docs(story-10): add the Jira backlog import
+| * 57b5b34 docs(story-10): add the README and handover document
+* | 2c48038 Merge pull request #10 from story/09-tutor-view
+|\| 
+| * d68588e (origin/story/09-tutor-view) feat(story-09): add the tutor's upcoming sessions view
+| * 45c19a6 test(story-09): add tutor view tests
+* | 1e86c81 Merge pull request #9 from story/08-schedule
+|\| 
+| * 31b756a (origin/story/08-schedule) feat(story-08): add the schedule and student history pages
+| * f7a1355 feat(story-08): add schedule queries and the student sessions route
+| * 5571a60 test(story-08): add schedule and student history tests
+* | 68889d6 Merge pull request #8 from story/07-manage-session
+|\| 
+| * fb088bb (origin/story/07-manage-session) docs(story-07): sync the implementation plan
+| * 74b2402 feat(story-07): add the session edit page and action routes
+| * 18fb347 feat(story-07): add move, cancel and outcome transitions
+| * dff566a test(story-07): add move, cancel and outcome tests
+* | 533e4bd Merge pull request #7 from story/06-book-session
+|\| 
+| * e5b257a (origin/story/06-book-session) docs(story-06): sync the plan and design spec
+| * 5aa6056 feat(story-06): add session routes and booking pages
+| * b62f37f feat(story-06): implement the tutor availability rule and booking
+| * 6c8416d test(story-06): add availability rule and booking tests
+* | 354127e Merge pull request #6 from story/05-availability
+|\| 
+| * 9009689 (origin/story/05-availability) docs(story-05): sync the implementation plan
+| * 8253776 feat(story-05): add availability routes and the tutor availability page
+| * 37890a5 feat(story-05): add the availability service
+| * 3d70c2b feat(story-05): add date and time parsing helpers
+| * 6c17cf1 test(story-05): add availability window tests
+* | 82015d9 Merge pull request #5 from story/04-tutors
+|\| 
+| * 40ebd20 (origin/story/04-tutors) docs(story-04): sync the implementation plan
+| * c9b989a feat(story-04): add the tutor list and form pages
+| * ea6c53a feat(story-04): add tutor routes and register them
+| * 0ee9e30 feat(story-04): add the tutor service
+| * 672c55d test(story-04): add tutor record tests
+* | e4c896a Merge pull request #4 from story/03-students
+|\| 
+| * 029fbcb (origin/story/03-students) docs(story-03): sync the plan and design notes
+| * 18e8a00 feat(story-03): add the student list and form pages
+| * 061353a feat(story-03): add student routes and the shared 404 helper
+| * c2bcb52 feat(story-03): add the student service
+| * 9742fb6 test(story-03): add student record tests
+* | b5ed87d Merge pull request #3 from story/02-auth
+|\| 
+| * c68f20e (origin/story/02-auth) docs(story-02): sync the implementation plan
+| * 2a7869e feat(story-02): add the login page and register the routers
+| * b1ce713 feat(story-02): add session login and role guards
+| * 6fc70bc test(story-02): add login and role tests
+* | 4fd5126 Merge pull request #2 from Hshenglin/story/01-foundation
+|\| 
+| * 93b6c45 (origin/story/01-foundation) docs(story-01): sync the implementation plan
+| * a33c828 test(story-01): add test fixtures and foundation tests
+| * 1b3e36e feat(story-01): assemble the application and seed the demo data
+| * dc03bd3 feat(story-01): add the base layout, error page and stylesheet
+| * 73dfff4 feat(story-01): add shared errors, templating helpers and password hashing
+| * 470b6d8 feat(story-01): add the database engine and domain models
+| * 4fb9280 chore(story-01): add dependencies and configuration
+|/  
+* ed59303 docs: add Redgum Tutoring implementation plan (10 stories)
+* c1ec724 docs: add Redgum Tutoring design spec (Python/FastAPI/Jinja2)
