@@ -82,3 +82,48 @@ def test_equal_start_and_end_is_rejected(admin_client, tutor_record, db_session)
 def test_windows_are_listed_in_week_order(admin_client, tutor_record):
     text = admin_client.get(f"/tutors/{tutor_record.id}/availability").text
     assert text.index("<td>Tuesday</td>") < text.index("<td>Thursday</td>") < text.index("<td>Saturday</td>")
+
+
+def test_each_window_row_links_to_its_edit_page(admin_client, tutor_record):
+    window = tutor_record.windows[0]
+    text = admin_client.get(f"/tutors/{tutor_record.id}/availability").text
+    assert f'href="/availability/{window.id}/edit"' in text
+
+
+def test_edit_page_prefills_the_stored_window(admin_client, tutor_record):
+    window = tutor_record.windows[0]
+    r = admin_client.get(f"/availability/{window.id}/edit")
+    assert r.status_code == 200
+    assert f'action="/availability/{window.id}/edit"' in r.text
+    assert 'value="15:30"' in r.text
+    assert 'value="19:00"' in r.text
+
+
+def test_edit_window(admin_client, tutor_record, db_session):
+    window = tutor_record.windows[0]
+    r = admin_client.post(f"/availability/{window.id}/edit", data={
+        "day_of_week": "TUESDAY", "start_time": "16:00", "end_time": "19:00",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    db_session.refresh(window)
+    assert window.start_time == time(16, 0)
+
+
+def test_invalid_edit_keeps_the_stored_window(admin_client, tutor_record, db_session):
+    window = tutor_record.windows[0]
+    r = admin_client.post(f"/availability/{window.id}/edit", data={
+        "day_of_week": "MONDAY", "start_time": "16:00", "end_time": "15:00",
+    })
+    assert r.status_code == 400
+    assert "Day must be one of Tuesday to Saturday." in r.text
+    assert "End time must be after the start time." in r.text
+    db_session.refresh(window)
+    assert window.day_of_week == "TUESDAY"
+    assert window.start_time == time(15, 30)
+
+
+def test_unknown_window_edit_returns_404(admin_client):
+    assert admin_client.get("/availability/9999/edit").status_code == 404
+    assert admin_client.post("/availability/9999/edit", data={
+        "day_of_week": "TUESDAY", "start_time": "15:30", "end_time": "18:00",
+    }).status_code == 404
