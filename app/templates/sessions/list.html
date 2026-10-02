@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Sessions — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Sessions</h1>
+  <a class="button primary" href="/sessions/new">Book session</a>
+</div>
+<form method="get" action="/sessions" class="filters card">
+  <div class="field" style="margin:0">
+    <label for="date_from">From</label>
+    <input type="date" id="date_from" name="date_from" value="{{ filters.date_from }}">
+  </div>
+  <div class="field" style="margin:0">
+    <label for="date_to">To</label>
+    <input type="date" id="date_to" name="date_to" value="{{ filters.date_to }}">
+  </div>
+  <div class="field" style="margin:0">
+    <label for="tutor_id">Tutor</label>
+    <select id="tutor_id" name="tutor_id">
+      <option value="">All</option>
+      {% for t in tutors %}
+        <option value="{{ t.id }}" {% if filters.tutor_id == t.id | string %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field" style="margin:0">
+    <label for="student_id">Student</label>
+    <select id="student_id" name="student_id">
+      <option value="">All</option>
+      {% for s in students %}
+        <option value="{{ s.id }}" {% if filters.student_id == s.id | string %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field" style="margin:0">
+    <label for="status">Status</label>
+    <select id="status" name="status">
+      <option value="">All</option>
+      {% for value in ['BOOKED', 'ATTENDED', 'CANCELLED', 'MISSED'] %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ value.title() }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit">Filter</button>
+</form>
+{% if sessions %}
+<table>
+  <thead>
+    <tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Student</th><th scope="col">Tutor</th><th scope="col">Subject</th><th scope="col">Status</th><th scope="col"></th></tr>
+  </thead>
+  <tbody>
+  {% for s in sessions %}
+    <tr>
+      <td>{{ s.session_date | date_long }}</td>
+      <td>{{ s.start_time | time12 }}</td>
+      <td>{{ s.length_minutes }} min</td>
+      <td>{{ s.student.name }}</td>
+      <td>{{ s.tutor.name }}</td>
+      <td>{{ s.subject }}</td>
+      <td><span class="status status-{{ s.status }}">{{ s.status.title() }}</span></td>
+      <td class="actions">
+        {% if s.status == 'BOOKED' %}
+          <a class="button" href="/sessions/{{ s.id }}/edit">Move</a>
+          <form class="inline" method="post" action="/sessions/{{ s.id }}/status">
+            <input type="hidden" name="outcome" value="ATTENDED">
+            <button type="submit">Attended</button>
+          </form>
+          <form class="inline" method="post" action="/sessions/{{ s.id }}/status">
+            <input type="hidden" name="outcome" value="MISSED">
+            <button type="submit">Missed</button>
+          </form>
+          <form class="inline" method="post" action="/sessions/{{ s.id }}/cancel">
+            <button type="submit" class="danger">Cancel</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No sessions match.</p>
+{% endif %}
+{% endblock %}
