@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.models import Student
@@ -8,7 +8,7 @@ def list_students(db: OrmSession, q: str = "", status: str = "") -> list[Student
     stmt = select(Student)
     if q.strip():
         like = f"%{q.strip()}%"
-        stmt = stmt.where(Student.name.ilike(like))
+        stmt = stmt.where(or_(Student.name.ilike(like), Student.contact_name.ilike(like)))
     if status in ("ACTIVE", "INACTIVE"):
         stmt = stmt.where(Student.status == status)
     return list(db.scalars(stmt.order_by(Student.name)))

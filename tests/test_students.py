@@ -72,6 +72,14 @@ def test_search_filters_by_name(admin_client, make_student):
     assert "Ella Nguyen" not in r.text
 
 
+def test_search_matches_the_family_contact_name(admin_client, make_student):
+    make_student(name="Ella Nguyen", contact_name="Mai Nguyen")
+    make_student(name="Kai Lombardo", contact_name="Gina Lombardo")
+    r = admin_client.get("/students?q=Gina")
+    assert "Kai Lombardo" in r.text
+    assert "Ella Nguyen" not in r.text
+
+
 def test_tutor_cannot_access_students(tutor_client):
     assert tutor_client.get("/students").status_code == 403
 
