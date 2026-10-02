@@ -49,6 +49,12 @@ def add_window(tutor_id: int, request: Request, day_of_week: str = Form(""),
         return _page(request, tutor,
                      {"day_of_week": day_of_week, "start_time": start_time, "end_time": end_time},
                      errors, status_code=400)
+    if availability_service.window_exists(db, tutor.id, data["day_of_week"], data["start_time"],
+                                          data["end_time"]):
+        errors.append("That availability window already exists.")
+        return _page(request, tutor,
+                     {"day_of_week": day_of_week, "start_time": start_time, "end_time": end_time},
+                     errors, status_code=400)
     availability_service.add_window(db, tutor, **data)
     flash(request, f"Availability added for {tutor.name}.")
     return RedirectResponse(f"/tutors/{tutor.id}/availability", status_code=303)
@@ -83,6 +89,11 @@ def edit_window(window_id: int, request: Request, day_of_week: str = Form(""),
     data, errors = availability_service.validate_window_form(day_of_week, start_time, end_time)
     form = {"day_of_week": day_of_week, "start_time": start_time, "end_time": end_time}
     if errors:
+        return _edit_page(request, window, form, errors, status_code=400)
+    if availability_service.window_exists(db, window.tutor_id, data["day_of_week"],
+                                          data["start_time"], data["end_time"],
+                                          exclude_id=window.id):
+        errors.append("That availability window already exists.")
         return _edit_page(request, window, form, errors, status_code=400)
     availability_service.update_window(db, window, **data)
     flash(request, f"Availability updated for {window.tutor.name}.")

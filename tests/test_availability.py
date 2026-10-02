@@ -127,3 +127,36 @@ def test_unknown_window_edit_returns_404(admin_client):
     assert admin_client.post("/availability/9999/edit", data={
         "day_of_week": "TUESDAY", "start_time": "15:30", "end_time": "18:00",
     }).status_code == 404
+
+
+def test_duplicate_window_is_rejected(admin_client, tutor_record, db_session):
+    before = db_session.query(AvailabilityWindow).count()
+    r = admin_client.post(f"/tutors/{tutor_record.id}/availability", data={
+        "day_of_week": "TUESDAY", "start_time": "15:30", "end_time": "19:00",
+    })
+    assert r.status_code == 400
+    assert "That availability window already exists." in r.text
+    assert db_session.query(AvailabilityWindow).count() == before
+
+
+def test_editing_a_window_onto_another_window_is_rejected(admin_client, tutor_record, db_session):
+    tuesday, thursday = tutor_record.windows[0], tutor_record.windows[1]
+    r = admin_client.post(f"/availability/{thursday.id}/edit", data={
+        "day_of_week": tuesday.day_of_week,
+        "start_time": tuesday.start_time.strftime("%H:%M"),
+        "end_time": tuesday.end_time.strftime("%H:%M"),
+    })
+    assert r.status_code == 400
+    assert "That availability window already exists." in r.text
+    db_session.refresh(thursday)
+    assert thursday.day_of_week == "THURSDAY"
+
+
+def test_saving_a_window_onto_itself_is_allowed(admin_client, tutor_record, db_session):
+    window = tutor_record.windows[0]
+    r = admin_client.post(f"/availability/{window.id}/edit", data={
+        "day_of_week": window.day_of_week,
+        "start_time": window.start_time.strftime("%H:%M"),
+        "end_time": window.end_time.strftime("%H:%M"),
+    }, follow_redirects=False)
+    assert r.status_code == 303
