@@ -8,7 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import COOKIE_SECURE, SECRET_KEY, SESSION_MAX_AGE_SECONDS
 from app.db import init_db
-from app.routers import auth, views
+from app.routers import auth, students, views
 from app.security import RedirectToLogin
 from app.templating import render
 
@@ -32,6 +32,7 @@ app.add_middleware(
 )
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(auth.router)
+app.include_router(students.router)
 app.include_router(views.router)
 
 
@@ -42,8 +43,9 @@ async def redirect_to_login(request: Request, exc: RedirectToLogin):
 
 @app.exception_handler(HTTPException)
 async def http_exception(request: Request, exc: HTTPException):
-    if exc.status_code in (403, 404):
-        heading = "Not allowed" if exc.status_code == 403 else "Page not found"
-        return render(request, "error.html", {"message": exc.detail, "heading": heading},
+    if exc.status_code in (400, 403, 404):
+        headings = {400: "Invalid request", 403: "Not allowed", 404: "Page not found"}
+        return render(request, "error.html",
+                      {"message": exc.detail, "heading": headings[exc.status_code]},
                       status_code=exc.status_code)
     return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)

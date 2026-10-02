@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit student' if student else 'Add student' }} — Redgum Tutoring{% endblock %}
+{% block content %}
+<section class="card" style="max-width: 560px;">
+  <h1>{{ 'Edit student' if student else 'Add student' }}</h1>
+  {% if errors %}
+    <div class="errors" role="alert">
+      <strong>Please fix the following:</strong>
+      <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post" action="{{ ('/students/' ~ student.id ~ '/edit') if student else '/students/new' }}">
+    <div class="field">
+      <label for="name">Student name *</label>
+      <input id="name" name="name" value="{{ form.get('name', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="year_level">Year level * (5–12)</label>
+      <input id="year_level" name="year_level" value="{{ form.get('year_level', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="school">School</label>
+      <input id="school" name="school" value="{{ form.get('school', '') }}">
+    </div>
+    <div class="field">
+      <label for="contact_name">Family contact name *</label>
+      <input id="contact_name" name="contact_name" value="{{ form.get('contact_name', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="contact_phone">Family contact phone *</label>
+      <input id="contact_phone" name="contact_phone" value="{{ form.get('contact_phone', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="contact_email">Family contact email</label>
+      <input id="contact_email" name="contact_email" value="{{ form.get('contact_email', '') }}">
+    </div>
+    <div class="field">
+      <label for="subjects">Subjects wanted</label>
+      <input id="subjects" name="subjects" value="{{ form.get('subjects', '') }}"
+             placeholder="Physics, Maths Methods">
+    </div>
+    <button type="submit" class="primary">Save</button>
+    <a class="button" href="/students">Cancel</a>
+  </form>
+</section>
+{% endblock %}

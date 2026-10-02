@@ -29,7 +29,7 @@ Redgum Tutoring 是 Ipswich 的一家课后辅导中心(约 140 名在读学生�
 |---|------|------|---------|
 | 1 | `story/01-foundation` | 项目骨架与数据模型 | FastAPI 可启动;SQLite 建表;5 个模型;基础模板与静态资源;空库可运行 |
 | 2 | `story/02-auth` | 登录与角色 | `username`+密码登录(会话 cookie);ADMIN/TUTOR 两种角色;未登录跳转登录页;导师不能访问管理页面 |
-| 3 | `story/03-students` | 管理员维护学生 | 新增(姓名/年级/家长联系方式必填,缺哪项报哪项)、查询(按姓名/年级搜索)、编辑、停用/启用 |
+| 3 | `story/03-students` | 管理员维护学生 | 新增(姓名/年级/家长联系方式必填,缺哪项报哪项)、查询(按姓名/家长联系人搜索)、编辑、停用/启用 |
 | 4 | `story/04-tutors` | 管理员维护导师 | 新增(姓名+科目)、编辑、停用/启用;**停用导师不出现在排课下拉中**;保留历史课时 |
 | 5 | `story/05-availability` | 管理员维护可用时段 | 为导师增/改/删可用时段(星期几+起止时间);同一导师多条;界面展示清晰 |
 | 6 | `story/06-book-session` | 排课(**核心领域逻辑**) | 选择学生/导师/科目/日期/开始时间/时长(60/90);**必须完整落在导师当天某可用时段内**,否则拒绝并说明原因;新课时状态 BOOKED |
@@ -190,7 +190,7 @@ SQLite;时间字段用 `Date`/`Time`(SQLAlchemy),金额无关(本项目不涉及
 | GET/POST | `/login` | 公开 | 登录表单 / 提交 |
 | POST | `/logout` | 登录 | 登出 |
 | GET | `/` | 登录 | ADMIN → `/students`;TUTOR → `/my-sessions` |
-| GET | `/students` | ADMIN | 列表 + 姓名/年级搜索 + 状态筛选 |
+| GET | `/students` | ADMIN | 列表 + 姓名/家长联系人搜索 + 状态筛选 |
 | GET/POST | `/students/new` | ADMIN | 新增(校验:姓名/年级/联系人必填) |
 | GET/POST | `/students/{id}/edit` | ADMIN | 编辑 |
 | POST | `/students/{id}/status` | ADMIN | 停用/启用 |
