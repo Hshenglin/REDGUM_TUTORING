@@ -71,7 +71,8 @@ git -c user.name="boyforest" -c user.email="boyforest@users.noreply.github.com" 
 | `app/services/schedule.py` | 日/周课表、学生历史、导师即将到来 |
 | `app/routers/auth.py` | `/login`、`/logout` |
 | `app/routers/students.py` | `/students*` |
-| `app/routers/tutors.py` | `/tutors*`、`/availability/*` |
+| `app/routers/tutors.py` | `/tutors*` |
+| `app/routers/availability.py` | `/tutors/{id}/availability`、`/availability/*` |
 | `app/routers/sessions.py` | `/sessions*` |
 | `app/routers/views.py` | `/`、`/schedule`、`/my-sessions` |
 | `app/templates/**` | base、login、error、students/*、tutors/*、sessions/*、schedule、my_sessions |
@@ -2182,7 +2183,7 @@ git commit -m "feat(story-04): tutor records with subjects and deactivation"
 **Files:**
 - Create: `app/validation.py`, `app/formatting.py`
 - Create: `app/services/availability.py`, `app/routers/availability.py`, `app/templates/tutors/availability.html`, `app/templates/tutors/availability_edit.html`
-- Modify: `app/templating.py`(注册 Jinja 过滤器)
+- Modify: `app/models.py`(新增 `DAY_ORDER`)、`app/templating.py`(注册 Jinja 过滤器)
 - Modify: `app/main.py`(注册路由)
 - Create: `tests/test_availability.py`
 
@@ -2261,6 +2262,58 @@ def test_tutor_cannot_manage_availability(tutor_client, tutor_record):
 
 def test_unknown_tutor_returns_404(admin_client):
     assert admin_client.get("/tutors/9999/availability").status_code == 404
+
+
+def test_duplicate_window_is_rejected(admin_client, tutor_record, db_session):
+    before = db_session.query(AvailabilityWindow).count()
+    r = admin_client.post(f"/tutors/{tutor_record.id}/availability", data={
+        "day_of_week": "TUESDAY", "start_time": "15:30", "end_time": "19:00",
+    })
+    assert r.status_code == 400
+    assert "That availability window already exists." in r.text
+    assert db_session.query(AvailabilityWindow).count() == before
+
+
+def test_editing_into_a_duplicate_is_rejected(admin_client, tutor_record, db_session):
+    thursday = [w for w in tutor_record.windows if w.day_of_week == "THURSDAY"][0]
+    r = admin_client.post(f"/availability/{thursday.id}/edit", data={
+        "day_of_week": "TUESDAY", "start_time": "15:30", "end_time": "19:00",
+    })
+    assert r.status_code == 400
+    assert "That availability window already exists." in r.text
+    db_session.refresh(thursday)
+    assert thursday.day_of_week == "THURSDAY"
+
+
+def test_unknown_window_edit_and_delete_return_404(admin_client):
+    assert admin_client.post("/availability/9999/edit", data={
+        "day_of_week": "TUESDAY", "start_time": "15:30", "end_time": "19:00",
+    }).status_code == 404
+    assert admin_client.post("/availability/9999/delete").status_code == 404
+
+
+def test_day_input_is_case_insensitive(admin_client, tutor_record, db_session):
+    r = admin_client.post(f"/tutors/{tutor_record.id}/availability", data={
+        "day_of_week": " wednesday ", "start_time": "15:30", "end_time": "17:00",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert db_session.query(AvailabilityWindow).filter_by(
+        tutor_id=tutor_record.id, day_of_week="WEDNESDAY").count() == 1
+
+
+def test_equal_start_and_end_is_rejected(admin_client, tutor_record, db_session):
+    before = db_session.query(AvailabilityWindow).count()
+    r = admin_client.post(f"/tutors/{tutor_record.id}/availability", data={
+        "day_of_week": "WEDNESDAY", "start_time": "16:00", "end_time": "16:00",
+    })
+    assert r.status_code == 400
+    assert "End time must be after the start time." in r.text
+    assert db_session.query(AvailabilityWindow).count() == before
+
+
+def test_windows_are_listed_in_week_order(admin_client, tutor_record):
+    text = admin_client.get(f"/tutors/{tutor_record.id}/availability").text
+    assert text.index("<td>Tuesday</td>") < text.index("<td>Thursday</td>") < text.index("<td>Saturday</td>")
 ```
 
 - [ ] **Step 3: 运行确认失败**
@@ -2269,7 +2322,7 @@ def test_unknown_tutor_returns_404(admin_client):
 uv run pytest tests/test_availability.py -q
 ```
 
-Expected: 全部失败(404)。
+Expected: 12 个失败(404);`test_unknown_tutor_returns_404` 与 `test_unknown_window_edit_and_delete_return_404` 因全局 404 处理先行通过(实现后仍通过)。
 
 - [ ] **Step 4: 写 `app/validation.py` 与 `app/formatting.py`**
 
@@ -2309,11 +2362,15 @@ def fmt_date(value: date) -> str:
 
 - [ ] **Step 5: 在 `app/templating.py` 注册过滤器**
 
-在 `templates = Jinja2Templates(...)` 之后加:
+在文件顶部 import 区加:
 
 ```python
 from app.formatting import fmt_date, fmt_time
+```
 
+在 `templates = Jinja2Templates(...)` 之后加:
+
+```python
 templates.env.filters["time12"] = fmt_time
 templates.env.filters["date_long"] = fmt_date
 ```
@@ -2323,6 +2380,7 @@ templates.env.filters["date_long"] = fmt_date
 ```python
 from datetime import time
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.models import DAY_ORDER, OPEN_DAYS, AvailabilityWindow, Tutor
@@ -2330,7 +2388,20 @@ from app.validation import parse_time
 
 
 def list_windows(tutor: Tutor) -> list[AvailabilityWindow]:
-    return sorted(tutor.windows, key=lambda w: (DAY_ORDER[w.day_of_week], w.start_time))
+    return sorted(tutor.windows, key=lambda w: (DAY_ORDER.get(w.day_of_week, len(DAY_ORDER)), w.start_time))
+
+
+def window_exists(db: OrmSession, tutor_id: int, day_of_week: str, start_time: time, end_time: time,
+                  exclude_id: int | None = None) -> bool:
+    stmt = select(AvailabilityWindow).where(
+        AvailabilityWindow.tutor_id == tutor_id,
+        AvailabilityWindow.day_of_week == day_of_week,
+        AvailabilityWindow.start_time == start_time,
+        AvailabilityWindow.end_time == end_time,
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(AvailabilityWindow.id != exclude_id)
+    return db.scalars(stmt).first() is not None
 
 
 def validate_window_form(day_of_week: str, start_time: str, end_time: str) -> tuple[dict, list[str]]:
@@ -2363,9 +2434,8 @@ def validate_window_form(day_of_week: str, start_time: str, end_time: str) -> tu
 
 def add_window(db: OrmSession, tutor: Tutor, *, day_of_week: str, start_time: time,
                end_time: time) -> AvailabilityWindow:
-    window = AvailabilityWindow(tutor_id=tutor.id, day_of_week=day_of_week,
-                                start_time=start_time, end_time=end_time)
-    db.add(window)
+    window = AvailabilityWindow(day_of_week=day_of_week, start_time=start_time, end_time=end_time)
+    tutor.windows.append(window)
     db.commit()
     return window
 
@@ -2407,7 +2477,7 @@ from app.templating import flash, render
 router = APIRouter(tags=["availability"])
 
 
-def _page(request: Request, db: OrmSession, tutor: Tutor, form: dict, errors: list[str],
+def _page(request: Request, tutor: Tutor, form: dict, errors: list[str],
           status_code: int = 200):
     return render(request, "tutors/availability.html", {
         "tutor": tutor,
@@ -2421,7 +2491,7 @@ def _page(request: Request, db: OrmSession, tutor: Tutor, form: dict, errors: li
 def availability_view(tutor_id: int, request: Request, user: AppUser = Depends(require_admin),
                       db: OrmSession = Depends(get_db)):
     tutor = get_or_404(db, Tutor, tutor_id, "Tutor")
-    return _page(request, db, tutor, {}, [])
+    return _page(request, tutor, {}, [])
 
 
 @router.post("/tutors/{tutor_id}/availability")
@@ -2430,8 +2500,11 @@ def add_window(tutor_id: int, request: Request, day_of_week: str = Form(""),
                user: AppUser = Depends(require_admin), db: OrmSession = Depends(get_db)):
     tutor = get_or_404(db, Tutor, tutor_id, "Tutor")
     data, errors = availability_service.validate_window_form(day_of_week, start_time, end_time)
+    if not errors and availability_service.window_exists(
+            db, tutor.id, data["day_of_week"], data["start_time"], data["end_time"]):
+        errors.append("That availability window already exists.")
     if errors:
-        return _page(request, db, tutor,
+        return _page(request, tutor,
                      {"day_of_week": day_of_week, "start_time": start_time, "end_time": end_time},
                      errors, status_code=400)
     availability_service.add_window(db, tutor, **data)
@@ -2459,6 +2532,10 @@ def edit_window(window_id: int, request: Request, day_of_week: str = Form(""),
     window = get_or_404(db, AvailabilityWindow, window_id, "Availability window")
     data, errors = availability_service.validate_window_form(day_of_week, start_time, end_time)
     form = {"day_of_week": day_of_week, "start_time": start_time, "end_time": end_time}
+    if not errors and availability_service.window_exists(
+            db, window.tutor_id, data["day_of_week"], data["start_time"], data["end_time"],
+            exclude_id=window.id):
+        errors.append("That availability window already exists.")
     if errors:
         return render(request, "tutors/availability_edit.html",
                       {"window": window, "tutor": window.tutor, "form": form, "errors": errors},
@@ -2489,7 +2566,7 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
   <a class="button" href="/tutors">Back to tutors</a>
 </div>
 {% if errors %}
-    <div class="errors">
+    <div class="errors" role="alert">
       <strong>Please fix the following:</strong>
     <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
   </div>
@@ -2498,7 +2575,7 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
   <h2>Current windows</h2>
   {% if windows %}
   <table>
-    <thead><tr><th>Day</th><th>From</th><th>Until</th><th></th></tr></thead>
+    <thead><tr><th scope="col">Day</th><th scope="col">From</th><th scope="col">Until</th><th scope="col"></th></tr></thead>
     <tbody>
     {% for w in windows %}
       <tr>
@@ -2524,7 +2601,7 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
   <form method="post" action="/tutors/{{ tutor.id }}/availability">
     <div class="field">
       <label for="day_of_week">Day</label>
-      <select id="day_of_week" name="day_of_week">
+      <select id="day_of_week" name="day_of_week" required>
         {% for day in ['TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] %}
           <option value="{{ day }}" {% if form.get('day_of_week') == day %}selected{% endif %}>{{ day.title() }}</option>
         {% endfor %}
@@ -2532,11 +2609,11 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
     </div>
     <div class="field">
       <label for="start_time">From</label>
-      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}">
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
     </div>
     <div class="field">
       <label for="end_time">Until</label>
-      <input type="time" id="end_time" name="end_time" value="{{ form.get('end_time', '') }}">
+      <input type="time" id="end_time" name="end_time" value="{{ form.get('end_time', '') }}" required>
     </div>
     <button type="submit" class="primary">Add window</button>
   </form>
@@ -2553,7 +2630,7 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
 <section class="card" style="max-width: 560px;">
   <h1>Edit availability — {{ tutor.name }}</h1>
   {% if errors %}
-    <div class="errors">
+    <div class="errors" role="alert">
       <strong>Please fix the following:</strong>
       <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
     </div>
@@ -2561,7 +2638,7 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
   <form method="post" action="/availability/{{ window.id }}/edit">
     <div class="field">
       <label for="day_of_week">Day</label>
-      <select id="day_of_week" name="day_of_week">
+      <select id="day_of_week" name="day_of_week" required>
         {% for day in ['TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] %}
           <option value="{{ day }}" {% if form.get('day_of_week') == day %}selected{% endif %}>{{ day.title() }}</option>
         {% endfor %}
@@ -2569,11 +2646,11 @@ def delete_window(window_id: int, request: Request, user: AppUser = Depends(requ
     </div>
     <div class="field">
       <label for="start_time">From</label>
-      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}">
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
     </div>
     <div class="field">
       <label for="end_time">Until</label>
-      <input type="time" id="end_time" name="end_time" value="{{ form.get('end_time', '') }}">
+      <input type="time" id="end_time" name="end_time" value="{{ form.get('end_time', '') }}" required>
     </div>
     <button type="submit" class="primary">Save</button>
     <a class="button" href="/tutors/{{ tutor.id }}/availability">Cancel</a>
@@ -2598,7 +2675,7 @@ app.include_router(availability.router)
 uv run pytest tests/test_availability.py -q
 ```
 
-Expected: `8 passed`。
+Expected: `14 passed`。
 
 - [ ] **Step 11: 手工验证**
 
