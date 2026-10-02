@@ -3416,9 +3416,10 @@ def test_a_finished_session_cannot_be_moved_or_cancelled(admin_client, tutor_rec
     })
     assert moved.status_code == 400
     assert "Only booked sessions can be moved." in moved.text
-    cancelled = admin_client.post(f"/sessions/{session.id}/cancel")
-    assert cancelled.status_code == 400
-    assert "Only booked sessions can be cancelled." in cancelled.text
+    cancelled = admin_client.post(f"/sessions/{session.id}/cancel", follow_redirects=False)
+    assert cancelled.status_code == 303
+    listing = admin_client.get("/sessions")
+    assert "Only booked sessions can be cancelled." in listing.text
 
 
 def test_moving_one_session_does_not_affect_another(admin_client, tutor_record, make_student, make_session, db_session):
@@ -3442,11 +3443,7 @@ def test_tutor_cannot_change_sessions(tutor_client, tutor_record, make_student, 
     assert tutor_client.get(f"/sessions/{session.id}/edit").status_code == 403
 ```
 
-同时在文件头补 import:
-
-```python
-from datetime import date, time
-```
+文件头已有 Task 6 加的 `from datetime import date, time`,无需重复。
 
 - [ ] **Step 3: 运行确认失败**
 
@@ -3566,11 +3563,12 @@ def set_status(session_id: int, request: Request, outcome: str = Form(""),
     return RedirectResponse("/sessions", status_code=303)
 ```
 
-同时补 import:
+同时补 import(`parse_date` 一行需补上 `parse_time`):
 
 ```python
-from app.models import AppUser, SESSION_LENGTHS, Session, Student, Tutor
+from app.models import AppUser, SESSION_LENGTHS, Session
 from app.routers._helpers import get_or_404
+from app.validation import parse_date, parse_time
 ```
 
 注意:`cancel`/`status` 用 flash 而不是 400 表单——它们是列表页的一键操作,失败时回列表并显示原因更自然;`edit` 是表单,失败回表单显示错误。
@@ -3588,7 +3586,7 @@ from app.routers._helpers import get_or_404
     ({{ session.length_minutes }} minutes)
   </p>
   {% if errors %}
-    <div class="errors">
+    <div class="errors" role="alert">
       <strong>Please fix the following:</strong>
       <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
     </div>
@@ -3596,16 +3594,16 @@ from app.routers._helpers import get_or_404
   <form method="post" action="/sessions/{{ session.id }}/edit">
     <div class="field">
       <label for="session_date">Date *</label>
-      <input type="date" id="session_date" name="session_date" value="{{ form.get('session_date', '') }}">
+      <input type="date" id="session_date" name="session_date" value="{{ form.get('session_date', '') }}" required>
     </div>
     <div class="field">
       <label for="start_time">Start time *</label>
-      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}">
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
       <div class="hint">The new time must fit entirely inside one of {{ session.tutor.name }}'s availability windows.</div>
     </div>
     <div class="field">
       <label for="length_minutes">Length *</label>
-      <select id="length_minutes" name="length_minutes">
+      <select id="length_minutes" name="length_minutes" required>
         <option value="60" {% if form.get('length_minutes') == '60' %}selected{% endif %}>60 minutes</option>
         <option value="90" {% if form.get('length_minutes') == '90' %}selected{% endif %}>90 minutes</option>
       </select>
@@ -3623,13 +3621,14 @@ from app.routers._helpers import get_or_404
 uv run pytest tests/test_sessions.py tests/test_availability_rule.py -q
 ```
 
-Expected: `14 passed`(sessions)+ `10 passed`(rule)。
+Expected: `18 passed`(sessions,11+7)+ `12 passed`(rule)。
 
 - [ ] **Step 8: 手工验证**
 
 ```bash
 uv run uvicorn app.main:app --port 8000 &
 sleep 3
+curl -s -c /tmp/rg.jar -X POST http://localhost:8000/login -d "username=deb&password=redgum123" -o /dev/null
 curl -s -b /tmp/rg.jar http://localhost:8000/sessions | grep -c "Cancelled"
 kill %1
 ```

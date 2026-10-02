@@ -9,7 +9,9 @@ templates.env.filters["date_long"] = fmt_date
 
 
 def flash(request: Request, message: str, category: str = "ok") -> None:
-    request.session.setdefault("flashes", []).append({"message": message, "category": category})
+    flashes = list(request.session.get("flashes", []))
+    flashes.append({"message": message, "category": category})
+    request.session["flashes"] = flashes
 
 
 def pop_flashes(request: Request) -> list[dict]:

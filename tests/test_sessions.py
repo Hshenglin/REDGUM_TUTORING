@@ -133,3 +133,81 @@ def test_inactive_students_sessions_are_still_listed(admin_client, tutor_record,
 def test_tutor_cannot_book_sessions(tutor_client):
     assert tutor_client.get("/sessions").status_code == 403
     assert tutor_client.get("/sessions/new").status_code == 403
+
+
+def test_move_a_session_within_availability(admin_client, tutor_record, make_student, make_session, db_session):
+    session = make_session(make_student(), tutor_record, session_date=date(2026, 8, 11), start_time=time(15, 30))
+    r = admin_client.post(f"/sessions/{session.id}/edit", data={
+        "session_date": "2026-08-11", "start_time": "17:00", "length_minutes": "60",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    db_session.refresh(session)
+    assert session.start_time == time(17, 0)
+
+
+def test_move_outside_availability_is_refused_and_nothing_changes(admin_client, tutor_record, make_student, make_session, db_session):
+    session = make_session(make_student(), tutor_record, session_date=date(2026, 8, 11), start_time=time(15, 30))
+    r = admin_client.post(f"/sessions/{session.id}/edit", data={
+        "session_date": "2026-08-11", "start_time": "18:30", "length_minutes": "60",
+    })
+    assert r.status_code == 400
+    assert "would not fit" in r.text
+    db_session.refresh(session)
+    assert session.start_time == time(15, 30)
+
+
+def test_cancel_a_session_keeps_it_visible(admin_client, tutor_record, make_student, make_session, db_session):
+    session = make_session(make_student(), tutor_record)
+    r = admin_client.post(f"/sessions/{session.id}/cancel", follow_redirects=False)
+    assert r.status_code == 303
+    db_session.refresh(session)
+    assert session.status == "CANCELLED"
+    listing = admin_client.get("/sessions")
+    assert "Cancelled" in listing.text
+
+
+def test_mark_attended_and_missed(admin_client, tutor_record, make_student, make_session, db_session):
+    attended = make_session(make_student(), tutor_record, start_time=time(15, 30))
+    missed = make_session(make_student(name="Kai Lombardo"), tutor_record, start_time=time(16, 30))
+
+    admin_client.post(f"/sessions/{attended.id}/status", data={"outcome": "ATTENDED"})
+    admin_client.post(f"/sessions/{missed.id}/status", data={"outcome": "MISSED"})
+
+    db_session.refresh(attended)
+    db_session.refresh(missed)
+    assert attended.status == "ATTENDED"
+    assert missed.status == "MISSED"
+
+
+def test_a_finished_session_cannot_be_moved_or_cancelled(admin_client, tutor_record, make_student, make_session):
+    session = make_session(make_student(), tutor_record, status="CANCELLED")
+    moved = admin_client.post(f"/sessions/{session.id}/edit", data={
+        "session_date": "2026-08-11", "start_time": "17:00", "length_minutes": "60",
+    })
+    assert moved.status_code == 400
+    assert "Only booked sessions can be moved." in moved.text
+    cancelled = admin_client.post(f"/sessions/{session.id}/cancel", follow_redirects=False)
+    assert cancelled.status_code == 303
+    listing = admin_client.get("/sessions")
+    assert "Only booked sessions can be cancelled." in listing.text
+
+
+def test_moving_one_session_does_not_affect_another(admin_client, tutor_record, make_student, make_session, db_session):
+    student = make_student()
+    first = make_session(student, tutor_record, start_time=time(15, 30))
+    second = make_session(student, tutor_record, start_time=time(17, 0))
+
+    admin_client.post(f"/sessions/{first.id}/edit", data={
+        "session_date": "2026-08-11", "start_time": "16:00", "length_minutes": "60",
+    })
+
+    db_session.refresh(first)
+    db_session.refresh(second)
+    assert first.start_time == time(16, 0)
+    assert second.start_time == time(17, 0)
+
+
+def test_tutor_cannot_change_sessions(tutor_client, tutor_record, make_student, make_session):
+    session = make_session(make_student(), tutor_record)
+    assert tutor_client.post(f"/sessions/{session.id}/cancel").status_code == 403
+    assert tutor_client.get(f"/sessions/{session.id}/edit").status_code == 403
