@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Tutors — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Tutors</h1>
+  <a class="button primary" href="/tutors/new">Add tutor</a>
+</div>
+<form method="get" action="/tutors" class="filters card">
+  <div class="field" style="margin:0">
+    <label for="q">Search</label>
+    <input id="q" name="q" value="{{ q }}" placeholder="Tutor or subject">
+  </div>
+  <div class="field" style="margin:0">
+    <label for="status">Status</label>
+    <select id="status" name="status">
+      <option value="" {% if not status %}selected{% endif %}>All</option>
+      <option value="ACTIVE" {% if status == 'ACTIVE' %}selected{% endif %}>Active</option>
+      <option value="INACTIVE" {% if status == 'INACTIVE' %}selected{% endif %}>Inactive</option>
+    </select>
+  </div>
+  <button type="submit">Filter</button>
+</form>
+{% if tutors %}
+<table>
+  <thead>
+    <tr><th scope="col">Name</th><th scope="col">Subjects</th><th scope="col">Phone</th><th scope="col">Availability</th><th scope="col">Status</th><th scope="col"></th></tr>
+  </thead>
+  <tbody>
+  {% for t in tutors %}
+    <tr>
+      <td>{{ t.name }}</td>
+      <td>{{ t.subjects }}</td>
+      <td>{{ t.phone or '—' }}</td>
+      <td>{{ t.windows | length }} window{{ '' if t.windows | length == 1 else 's' }}</td>
+      <td><span class="status status-{{ t.status }}">{{ t.status.title() }}</span></td>
+      <td class="actions">
+        <a class="button" href="/tutors/{{ t.id }}/availability">Availability</a>
+        <a class="button" href="/tutors/{{ t.id }}/edit">Edit</a>
+        <form class="inline" method="post" action="/tutors/{{ t.id }}/status">
+          <input type="hidden" name="status" value="{{ 'INACTIVE' if t.status == 'ACTIVE' else 'ACTIVE' }}">
+          <button type="submit">{{ 'Deactivate' if t.status == 'ACTIVE' else 'Activate' }}</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No tutors match.</p>
+{% endif %}
+{% endblock %}
