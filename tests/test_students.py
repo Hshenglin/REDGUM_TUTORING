@@ -128,3 +128,37 @@ def test_non_numeric_year_level_is_reported(admin_client, db_session):
     })
     assert r.status_code == 400
     assert "Year level must be a whole number between 5 and 12." in r.text
+
+
+def test_over_length_name_is_rejected(admin_client, db_session):
+    r = admin_client.post("/students/new", data={
+        "name": "x" * 101, "year_level": "11", "contact_name": "Y", "contact_phone": "0400",
+    })
+    assert r.status_code == 400
+    assert "Student name must be 100 characters or fewer." in r.text
+    assert db_session.query(Student).count() == 0
+
+
+def test_every_bounded_student_field_is_rejected_over_its_limit(admin_client, db_session):
+    r = admin_client.post("/students/new", data={
+        "name": "Boundary Student", "year_level": "11",
+        "school": "s" * 121, "contact_name": "c" * 101, "contact_phone": "0" * 21,
+        "contact_email": "e" * 121, "subjects": "s" * 201,
+    })
+    assert r.status_code == 400
+    assert "School must be 120 characters or fewer." in r.text
+    assert "Family contact name must be 100 characters or fewer." in r.text
+    assert "Family contact phone must be 20 characters or fewer." in r.text
+    assert "Family contact email must be 120 characters or fewer." in r.text
+    assert "Subjects must be 200 characters or fewer." in r.text
+    assert db_session.query(Student).count() == 0
+
+
+def test_a_blank_required_field_still_reports_the_required_message(admin_client, db_session):
+    r = admin_client.post("/students/new", data={
+        "name": "", "year_level": "11", "contact_name": "", "contact_phone": "",
+    })
+    assert r.status_code == 400
+    assert "Student name is required." in r.text
+    assert "Student name must be 100 characters or fewer." not in r.text
+    assert db_session.query(Student).count() == 0
