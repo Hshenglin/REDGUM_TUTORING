@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}My sessions — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>My sessions{% if tutor %} — {{ tutor.name }}{% endif %}</h1>
+</div>
+<section class="card">
+  {% if sessions %}
+    <table>
+      <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Length</th><th scope="col">Student</th><th scope="col">Subject</th></tr></thead>
+      <tbody>
+      {% for s in sessions %}
+        <tr>
+          <td>{{ s.session_date | date_long }}</td>
+          <td>{{ s.start_time | time12 }}</td>
+          <td>{{ s.length_minutes }} min</td>
+          <td>{{ s.student.name }}</td>
+          <td>{{ s.subject }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No upcoming sessions.</p>
+  {% endif %}
+</section>
+{% endblock %}
