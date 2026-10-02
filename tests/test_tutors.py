@@ -96,6 +96,37 @@ def test_search_matches_subjects(admin_client, tutor_record):
     assert "Tomás Ferreira" not in admin_client.get("/tutors?q=Nuclear").text
 
 
+def test_phone_at_the_length_boundary(admin_client, db_session):
+    accepted = admin_client.post("/tutors/new", data={
+        "name": "Boundary Tutor", "phone": "0" * 20, "subjects": "Maths",
+    }, follow_redirects=False)
+    assert accepted.status_code == 303
+    rejected = admin_client.post("/tutors/new", data={
+        "name": "Too Long", "phone": "0" * 21, "subjects": "Maths",
+    })
+    assert rejected.status_code == 400
+    assert "Phone must be 20 characters or fewer." in rejected.text
+    assert db_session.query(Tutor).filter_by(name="Too Long").count() == 0
+
+
+def test_over_length_tutor_name_and_subjects_are_rejected(admin_client, db_session):
+    r = admin_client.post("/tutors/new", data={
+        "name": "n" * 101, "phone": "0400", "subjects": "s" * 201,
+    })
+    assert r.status_code == 400
+    assert "Tutor name must be 100 characters or fewer." in r.text
+    assert "Subjects must be 200 characters or fewer." in r.text
+    assert db_session.query(Tutor).count() == 0
+
+
+def test_a_blank_required_tutor_field_still_reports_the_required_message(admin_client, db_session):
+    r = admin_client.post("/tutors/new", data={"name": "", "phone": "", "subjects": ""})
+    assert r.status_code == 400
+    assert "Tutor name is required." in r.text
+    assert "Tutor name must be 100 characters or fewer." not in r.text
+    assert db_session.query(Tutor).count() == 0
+
+
 def test_reactivate_tutor(admin_client, tutor_record, db_session):
     admin_client.post(f"/tutors/{tutor_record.id}/status", data={"status": "INACTIVE"})
     db_session.refresh(tutor_record)
