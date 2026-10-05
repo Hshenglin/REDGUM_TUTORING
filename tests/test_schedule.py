@@ -45,3 +45,14 @@ def test_student_history_lists_past_and_future(admin_client, tutor_record, make_
 
 def test_tutor_cannot_see_the_schedule(tutor_client):
     assert tutor_client.get("/schedule").status_code == 403
+
+
+def test_schedule_can_be_filtered_by_tutor(admin_client, tutor_record, make_student, make_session):
+    student = make_student()
+    make_session(student, tutor_record, session_date=date(2026, 8, 11), start_time=time(15, 30))
+
+    r = admin_client.get(f"/schedule?view=week&date=2026-08-11&tutor_id={tutor_record.id}")
+    assert "Ella Nguyen" in r.text
+
+    r = admin_client.get("/schedule?view=week&date=2026-08-11&tutor_id=9999")
+    assert "Ella Nguyen" not in r.text

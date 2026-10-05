@@ -34,7 +34,8 @@
       <td>{{ s.contact_name }}<br><span class="muted">{{ s.contact_phone }}</span></td>
       <td>{{ s.subjects or '—' }}</td>
       <td><span class="status status-{{ s.status }}">{{ s.status.title() }}</span></td>
-      <td class="actions">
+       <td class="actions">
+        <a class="button" href="/students/{{ s.id }}/sessions">Sessions</a>
         <a class="button" href="/students/{{ s.id }}/edit">Edit</a>
         <form class="inline" method="post" action="/students/{{ s.id }}/status">
           <input type="hidden" name="status" value="{{ 'INACTIVE' if s.status == 'ACTIVE' else 'ACTIVE' }}">

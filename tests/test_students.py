@@ -2,10 +2,11 @@ from app.models import Student
 
 
 def test_admin_sees_student_list(admin_client, make_student):
-    make_student(name="Ella Nguyen")
+    student = make_student(name="Ella Nguyen")
     r = admin_client.get("/students")
     assert r.status_code == 200
     assert "Ella Nguyen" in r.text
+    assert f"/students/{student.id}/sessions" in r.text
 
 
 def test_create_student(admin_client, db_session):
