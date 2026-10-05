@@ -95,8 +95,8 @@ redgum-tutoring/
 ├── README.md
 ├── .gitignore
 └── docs/
-    ├── superpowers/specs/   # 本文档
-    ├── superpowers/plans/   # 实施计划
+    ├── design-spec.md       # 本文档
+    ├── implementation-plan.md  # 实施计划
     ├── handover.md          # 交接文档(案例第 9 节六部分)
     └── jira-import.csv      # Jira 导入用 backlog
 ```
