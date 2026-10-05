@@ -5,9 +5,9 @@
   <h1>Schedule</h1>
   <div class="filters">
     <a class="button {% if view == 'day' %}primary{% endif %}"
-       href="/schedule?view=day&date={{ anchor_iso }}">Day</a>
+       href="/schedule?view=day&date={{ anchor_iso }}{% if tutor_id %}&tutor_id={{ tutor_id }}{% endif %}">Day</a>
     <a class="button {% if view == 'week' %}primary{% endif %}"
-       href="/schedule?view=week&date={{ anchor_iso }}">Week</a>
+       href="/schedule?view=week&date={{ anchor_iso }}{% if tutor_id %}&tutor_id={{ tutor_id }}{% endif %}">Week</a>
   </div>
 </div>
 <form method="get" action="/schedule" class="filters card">
@@ -16,7 +16,17 @@
     <label for="date">Date</label>
     <input type="date" id="date" name="date" value="{{ anchor_iso }}">
   </div>
+  <div class="field" style="margin:0">
+    <label for="tutor_id">Tutor</label>
+    <select id="tutor_id" name="tutor_id">
+      <option value="">All tutors</option>
+      {% for t in tutors %}
+        <option value="{{ t.id }}" {% if tutor_id == (t.id | string) %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <button type="submit">Show</button>
+  <button type="button" onclick="window.print()">Print</button>
 </form>
 {% for day, day_sessions in days %}
   <section class="card">
