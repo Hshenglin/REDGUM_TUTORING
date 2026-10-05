@@ -84,3 +84,11 @@ Environment variables (all optional, sensible defaults for local use):
 - Design spec: `docs/superpowers/specs/2026-09-24-redgum-tutoring-design.md`
 - Handover document: `docs/handover.md`
 - Backlog for Jira import: `docs/jira-import.csv`
+
+
+## Troubleshooting
+
+- **Port 8000 already in use** — run `python -m uvicorn app.main:app --port 8001` and open that port instead.
+- **The demo data looks wrong** — stop the server, delete `redgum.db`, and start it again; the database is recreated and reseeded.
+- **`pytest` cannot import `app`** — run it from the repository root (the folder containing `app/` and `tests/`).
+- **Tests leave a `redgum.db` behind** — the test suite uses an in-memory database; any `redgum.db` in the repository root is from running the app, not the tests.
