@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse
@@ -45,10 +45,15 @@ def schedule(request: Request, start: str = Query("", alias="date"), view: str =
 
 
 @router.get("/my-sessions")
-def my_sessions(request: Request, user: AppUser = Depends(require_user),
+def my_sessions(request: Request, range: str = "all",
+                user: AppUser = Depends(require_user),
                 db: OrmSession = Depends(get_db)):
     if user.tutor_id is None:
-        return render(request, "my_sessions.html", {"tutor": None, "sessions": []})
+        return render(request, "my_sessions.html",
+                      {"tutor": None, "sessions": [], "range": range})
     tutor = db.get(Tutor, user.tutor_id)
-    sessions = schedule_service.upcoming_for_tutor(db, tutor.id, date.today())
-    return render(request, "my_sessions.html", {"tutor": tutor, "sessions": sessions})
+    today = date.today()
+    until = today + timedelta(days=7) if range == "week" else None
+    sessions = schedule_service.upcoming_for_tutor(db, tutor.id, today, until)
+    return render(request, "my_sessions.html",
+                  {"tutor": tutor, "sessions": sessions, "range": range})

@@ -37,9 +37,11 @@ def student_sessions(db: OrmSession, student_id: int, today: date) -> tuple[list
     return past, future
 
 
-def upcoming_for_tutor(db: OrmSession, tutor_id: int, today: date) -> list[Session]:
-    return list(db.scalars(select(Session)
-                           .where(Session.tutor_id == tutor_id,
-                                  Session.session_date >= today,
-                                  Session.status == "BOOKED")
-                           .order_by(Session.session_date, Session.start_time)))
+def upcoming_for_tutor(db: OrmSession, tutor_id: int, today: date,
+                       until: date | None = None) -> list[Session]:
+    stmt = select(Session).where(Session.tutor_id == tutor_id,
+                                 Session.session_date >= today,
+                                 Session.status == "BOOKED")
+    if until is not None:
+        stmt = stmt.where(Session.session_date <= until)
+    return list(db.scalars(stmt.order_by(Session.session_date, Session.start_time)))
