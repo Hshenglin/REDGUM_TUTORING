@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, timedelta, time
 
 from app.models import Tutor
 
@@ -56,3 +56,20 @@ def test_anonymous_visitor_is_redirected_to_login(client):
 def test_tutor_cannot_open_admin_pages(tutor_client):
     assert tutor_client.get("/schedule").status_code == 403
     assert tutor_client.get("/students").status_code == 403
+
+
+def test_tutor_can_switch_between_the_next_week_and_all_upcoming(
+        tutor_client, tutor_record, make_student, make_session):
+    student = make_student()
+    make_session(student, tutor_record, session_date=date.today() + timedelta(days=2),
+                 start_time=time(16, 0), subject="Near Physics")
+    make_session(student, tutor_record, session_date=date.today() + timedelta(days=30),
+                 start_time=time(16, 0), subject="Far Physics")
+
+    near = tutor_client.get("/my-sessions?range=week")
+    assert "Near Physics" in near.text
+    assert "Far Physics" not in near.text
+
+    all_sessions = tutor_client.get("/my-sessions?range=all")
+    assert "Near Physics" in all_sessions.text
+    assert "Far Physics" in all_sessions.text

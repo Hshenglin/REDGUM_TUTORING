@@ -3,6 +3,10 @@
 {% block content %}
 <div class="toolbar">
   <h1>My sessions{% if tutor %} — {{ tutor.name }}{% endif %}</h1>
+  <div class="filters">
+    <a class="button {% if range == 'week' %}primary{% endif %}" href="/my-sessions?range=week">Next 7 days</a>
+    <a class="button {% if range != 'week' %}primary{% endif %}" href="/my-sessions?range=all">All upcoming</a>
+  </div>
 </div>
 <section class="card">
   {% if sessions %}
