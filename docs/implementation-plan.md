@@ -1,6 +1,6 @@
 # Redgum Tutoring Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Note:** this is the implementation plan. Tasks are tracked with checkbox syntax (`- [ ]`).
 
 **Goal:** 交付一个可运行的辅导中心排课系统(FastAPI + Jinja2 服务端渲染),支持学生/导师/可用时段管理、排课与改期时的**可用时段校验**、日/周课表与导师视图,并满足课程 DoD(干净 checkout 可跑、每故事一分支、pytest 全覆盖)。
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+(开发用 3.12)、FastAPI、Uvicorn、Jinja2、SQLAlchemy 2.x、bcrypt、python-multipart、itsdangerous;pytest + httpx TestClient。
 
-**Spec:** `docs/superpowers/specs/2026-09-24-redgum-tutoring-design.md`
+**Spec:** `docs/design-spec.md`
 
 ---
 
@@ -4281,7 +4281,7 @@ Environment variables (all optional, sensible defaults for local use):
 
 ## More documentation
 
-- Design spec: `docs/superpowers/specs/2026-09-24-redgum-tutoring-design.md`
+- Design spec: `docs/design-spec.md`
 - Handover document: `docs/handover.md`
 - Backlog for Jira import: `docs/jira-import.csv`
 ```

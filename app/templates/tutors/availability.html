@@ -23,6 +23,7 @@
         <td>{{ w.start_time | time12 }}</td>
         <td>{{ w.end_time | time12 }}</td>
         <td class="actions">
+          <a class="button" href="/availability/{{ w.id }}/edit">Edit</a>
           <form class="inline" method="post" action="/availability/{{ w.id }}/delete">
             <button type="submit" class="danger">Remove</button>
           </form>

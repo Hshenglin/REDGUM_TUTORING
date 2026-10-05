@@ -1,0 +1,4 @@
+﻿Captured from commit 33c9c61 on 2026-10-03 03:02 (local time).
+
+v0.1.0          Baseline application: the ten story branches
+v0.2.0          Group A tasks: search, field limits, availability editing and deployment configuration

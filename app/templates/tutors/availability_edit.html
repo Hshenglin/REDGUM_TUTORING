@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Edit availability — {{ tutor.name }} — Redgum Tutoring{% endblock %}
+{% block content %}
+<div class="toolbar">
+  <h1>Edit availability — {{ tutor.name }}</h1>
+  <a class="button" href="/tutors/{{ tutor.id }}/availability">Back to availability</a>
+</div>
+{% if errors %}
+    <div class="errors" role="alert">
+      <strong>Please fix the following:</strong>
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+<section class="card" style="max-width: 560px;">
+  <form method="post" action="/availability/{{ window.id }}/edit">
+    <div class="field">
+      <label for="day_of_week">Day</label>
+      <select id="day_of_week" name="day_of_week" required>
+        {% for day in ['TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] %}
+          <option value="{{ day }}" {% if form.get('day_of_week') == day %}selected{% endif %}>{{ day.title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="start_time">From</label>
+      <input type="time" id="start_time" name="start_time" value="{{ form.get('start_time', '') }}" required>
+    </div>
+    <div class="field">
+      <label for="end_time">Until</label>
+      <input type="time" id="end_time" name="end_time" value="{{ form.get('end_time', '') }}" required>
+    </div>
+    <button type="submit" class="primary">Save</button>
+  </form>
+</section>
+{% endblock %}

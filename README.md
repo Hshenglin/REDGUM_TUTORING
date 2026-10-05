@@ -9,6 +9,7 @@ SQLite database — nothing else to install.
 ## Prerequisites
 
 - Python 3.10 or newer
+- Optional: Docker and Docker Compose, for the containerised run
 
 ## Quick start
 
@@ -21,6 +22,20 @@ uvicorn app.main:app --reload
 
 Open <http://localhost:8000>. The SQLite database `redgum.db` is created and seeded on
 first start (delete the file to reset it).
+
+## Run with Docker
+
+```bash
+docker compose up --build
+```
+
+Open <http://localhost:8000>. The database is stored in the named volume `redgum-data`, so
+data survives container restarts. To run the image without Compose:
+
+```bash
+docker build -t redgum-tutoring .
+docker run -p 8000:8000 redgum-tutoring
+```
 
 ## Demo accounts
 
@@ -37,6 +52,10 @@ Password for all demo accounts: `redgum123` (illustrative values only).
 ```bash
 pytest
 ```
+
+The suite (110 tests) covers the records, the availability rule, sessions, the schedule and
+the tutor view. It is also run automatically by GitHub Actions on every push and pull
+request (see `.github/workflows/ci.yml`).
 
 ## What the system does
 
@@ -66,12 +85,25 @@ app/
   templates/       Jinja2 templates
   static/style.css single stylesheet (no CDN)
 tests/             pytest suite
-docs/              design spec, implementation plan, handover, Jira backlog
+docs/
+  design-spec.md          design document
+  implementation-plan.md  implementation plan
+  handover.md             sprint handover document
+  jira-import.csv         product backlog for the Jira import
+  evidence/               captured repository evidence (git log, branches, tags, test run)
+.github/workflows/ci.yml  continuous integration — runs the test suite
+CHANGELOG.md              release notes
+Dockerfile                container image definition
+docker-compose.yml        container run configuration (app + data volume)
+.env.example              sample environment configuration
+requirements.txt          Python dependencies
+pytest.ini                pytest configuration
 ```
 
 ## Configuration
 
-Environment variables (all optional, sensible defaults for local use):
+Environment variables (all optional, sensible defaults for local use). Copy `.env.example`
+to `.env` to set them locally; the `.env` file itself is not committed.
 
 | Variable                | Default                        | Purpose                                                    |
 |-------------------------|--------------------------------|------------------------------------------------------------|
@@ -79,9 +111,29 @@ Environment variables (all optional, sensible defaults for local use):
 | `REDGUM_DATABASE_URL`   | `sqlite:///./redgum.db`        | SQLAlchemy database URL                                    |
 | `REDGUM_COOKIE_SECURE`  | unset (off)                    | Set to `1` or `true` to add the `Secure` flag to the cookie (HTTPS) |
 
+## Deployment and continuous integration
+
+- The application is containerised (`Dockerfile` and `docker-compose.yml`) and runs from a
+  clean checkout by following the steps above.
+- GitHub Actions (`.github/workflows/ci.yml`) installs the dependencies and runs `pytest` on
+  every push and pull request.
+- Releases are tagged (`v0.1.0`, `v0.2.0`); notable changes are recorded in `CHANGELOG.md`.
+
+## Development workflow
+
+- **Branching** — one short-lived branch per unit of work, named for its type:
+  `story/NN-name` for the development stories, `group-a/...` for the enhancement work, and
+  `chore/...` or `docs/...` for maintenance.
+- **Commits** follow Conventional Commits — `feat(scope):`, `test(scope):`, `docs(scope):`,
+  `build(...)`, `ci:`, `chore(...)` — so the history is self-documenting.
+- **Integration** — each branch is merged into `main` through a pull request, using a
+  no-fast-forward merge so that every unit of work keeps a traceable merge commit.
+- **Releases** are tagged (`v0.1.0`, `v0.2.0`).
+
 ## More documentation
 
-- Design spec: `docs/superpowers/specs/2026-09-24-redgum-tutoring-design.md`
+- Design spec: `docs/design-spec.md`
+- Implementation plan: `docs/implementation-plan.md`
 - Handover document: `docs/handover.md`
 - Backlog for Jira import: `docs/jira-import.csv`
 
@@ -92,3 +144,4 @@ Environment variables (all optional, sensible defaults for local use):
 - **The demo data looks wrong** — stop the server, delete `redgum.db`, and start it again; the database is recreated and reseeded.
 - **`pytest` cannot import `app`** — run it from the repository root (the folder containing `app/` and `tests/`).
 - **Tests leave a `redgum.db` behind** — the test suite uses an in-memory database; any `redgum.db` in the repository root is from running the app, not the tests.
+- Repository evidence: `docs/evidence/`

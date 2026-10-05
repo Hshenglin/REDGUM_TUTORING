@@ -1,0 +1,24 @@
+﻿Captured from commit 33c9c61 on 2026-10-03 03:02 (local time).
+
+  chore/a2-deployment-configuration                52333b6 [origin/chore/a2-deployment-configuration] docs: add changelog and pytest configuration
+* docs/evidence-captures                           33c9c61 Merge pull request #15 from chore/a2-deployment-configuration
+  group-a/story-03-students                        ebe53cd [origin/group-a/story-03-students] feat(story-03): bound student field lengths
+  group-a/story-04-tutors                          5cc7a01 [origin/group-a/story-04-tutors] feat(story-04): bound tutor field lengths
+  group-a/story-05-availability                    c9d1c1f [origin/group-a/story-05-availability] feat(story-05): reject duplicate availability windows
+  main                                             33c9c61 [origin/main] Merge pull request #15 from chore/a2-deployment-configuration
+  remotes/origin/HEAD                              -> origin/main
+  remotes/origin/chore/a2-deployment-configuration 52333b6 docs: add changelog and pytest configuration
+  remotes/origin/group-a/story-03-students         ebe53cd feat(story-03): bound student field lengths
+  remotes/origin/group-a/story-04-tutors           5cc7a01 feat(story-04): bound tutor field lengths
+  remotes/origin/group-a/story-05-availability     c9d1c1f feat(story-05): reject duplicate availability windows
+  remotes/origin/main                              33c9c61 Merge pull request #15 from chore/a2-deployment-configuration
+  remotes/origin/story/01-foundation               93b6c45 docs(story-01): sync the implementation plan
+  remotes/origin/story/02-auth                     c68f20e docs(story-02): sync the implementation plan
+  remotes/origin/story/03-students                 029fbcb docs(story-03): sync the plan and design notes
+  remotes/origin/story/04-tutors                   40ebd20 docs(story-04): sync the implementation plan
+  remotes/origin/story/05-availability             9009689 docs(story-05): sync the implementation plan
+  remotes/origin/story/06-book-session             e5b257a docs(story-06): sync the plan and design spec
+  remotes/origin/story/07-manage-session           fb088bb docs(story-07): sync the implementation plan
+  remotes/origin/story/08-schedule                 31b756a feat(story-08): add the schedule and student history pages
+  remotes/origin/story/09-tutor-view               d68588e feat(story-09): add the tutor's upcoming sessions view
+  remotes/origin/story/10-delivery                 c53ed9e docs(story-10): record the team split and delegated work

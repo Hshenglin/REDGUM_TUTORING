@@ -1,0 +1,16 @@
+﻿Captured from commit 33c9c61 on 2026-10-03 03:02 (local time).
+
+33c9c61 Merge pull request #15 from chore/a2-deployment-configuration
+81f2441 Merge pull request #14 from group-a/story-05-availability
+9a0b102 Merge pull request #13 from group-a/story-04-tutors
+7c2ac53 Merge pull request #12 from group-a/story-03-students
+a2f77b3 Merge pull request #11 from story/10-delivery
+2c48038 Merge pull request #10 from story/09-tutor-view
+1e86c81 Merge pull request #9 from story/08-schedule
+68889d6 Merge pull request #8 from story/07-manage-session
+533e4bd Merge pull request #7 from story/06-book-session
+354127e Merge pull request #6 from story/05-availability
+82015d9 Merge pull request #5 from story/04-tutors
+e4c896a Merge pull request #4 from story/03-students
+b5ed87d Merge pull request #3 from story/02-auth
+4fd5126 Merge pull request #2 from Hshenglin/story/01-foundation
