@@ -8,6 +8,7 @@ from app.db import get_db
 from app.models import AppUser, Tutor
 from app.security import require_admin, require_user
 from app.services import schedule as schedule_service
+from app.services import tutors as tutor_service
 from app.templating import render
 from app.validation import parse_date
 
@@ -23,17 +24,18 @@ def home(user: AppUser = Depends(require_user)):
 
 @router.get("/schedule")
 def schedule(request: Request, start: str = Query("", alias="date"), view: str = "week",
-             user: AppUser = Depends(require_admin),
+             tutor_id: str = "", user: AppUser = Depends(require_admin),
              db: OrmSession = Depends(get_db)):
     anchor = parse_date(start) or date.today()
+    tutor_filter = int(tutor_id) if tutor_id.isdigit() else None
 
     if view == "day":
-        sessions = schedule_service.sessions_between(db, anchor, anchor)
+        sessions = schedule_service.sessions_between(db, anchor, anchor, tutor_filter)
         days = [(anchor, sessions)]
     else:
         range_start = schedule_service.week_start(anchor)
         sessions = schedule_service.sessions_between(
-            db, range_start, schedule_service.week_days(range_start)[-1])
+            db, range_start, schedule_service.week_days(range_start)[-1], tutor_filter)
         days = [(day, schedule_service.sessions_on(sessions, day))
                 for day in schedule_service.week_days(range_start)]
 
@@ -41,6 +43,8 @@ def schedule(request: Request, start: str = Query("", alias="date"), view: str =
         "days": days,
         "view": "day" if view == "day" else "week",
         "anchor_iso": anchor.isoformat(),
+        "tutor_id": tutor_id if tutor_filter else "",
+        "tutors": tutor_service.list_tutors(db),
     })
 
 

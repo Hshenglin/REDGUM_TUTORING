@@ -93,3 +93,11 @@ button.danger { color: var(--warn-ink); }
 .muted { color: var(--muted); }
 .empty { color: var(--muted); padding: 12px 0; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+@media print {
+  .topbar, .filters, .flash, button, .button { display: none !important; }
+  body { background: #fff; }
+  main { max-width: none; margin: 0; padding: 0; }
+  .card { border: none; padding: 0; margin-bottom: 12px; }
+  th, td { border-bottom: 1px solid #999; }
+}
