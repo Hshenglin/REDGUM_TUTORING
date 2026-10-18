@@ -1,4 +1,4 @@
-﻿Captured from commit 33c9c61 on 2026-10-03 03:02 (local time).
+Captured from commit 807b229 on 2026-10-19 01:05 (local time).
 
 .env.example
 .github/workflows/ci.yml
@@ -48,10 +48,16 @@ app/templates/tutors/list.html
 app/templating.py
 app/validation.py
 docker-compose.yml
+docs/design-spec.md
+docs/evidence/01-git-log-graph.txt
+docs/evidence/02-branch-list.txt
+docs/evidence/03-merge-history.txt
+docs/evidence/04-tag-list.txt
+docs/evidence/05-test-run.txt
+docs/evidence/06-file-listing.txt
 docs/handover.md
+docs/implementation-plan.md
 docs/jira-import.csv
-docs/superpowers/plans/2026-09-24-redgum-tutoring-implementation.md
-docs/superpowers/specs/2026-09-24-redgum-tutoring-design.md
 pytest.ini
 requirements.txt
 tests/__init__.py

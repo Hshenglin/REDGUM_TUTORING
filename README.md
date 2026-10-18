@@ -53,7 +53,7 @@ Password for all demo accounts: `redgum123` (illustrative values only).
 pytest
 ```
 
-The suite (110 tests) covers the records, the availability rule, sessions, the schedule and
+The suite (111 tests) covers the records, the availability rule, sessions, the schedule and
 the tutor view. It is also run automatically by GitHub Actions on every push and pull
 request (see `.github/workflows/ci.yml`).
 

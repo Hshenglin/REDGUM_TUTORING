@@ -1,9 +1,31 @@
-﻿Captured from commit 33c9c61 on 2026-10-03 03:02 (local time).
+Captured from commit 807b229 on 2026-10-19 01:05 (local time).
 
-*   33c9c61 (HEAD -> docs/evidence-captures, tag: v0.2.0, origin/main, origin/HEAD, main) Merge pull request #15 from chore/a2-deployment-configuration
+*   807b229 (HEAD -> main, origin/main, origin/HEAD) Merge pull request #17 from Hshenglin/story/08-schedule
 |\  
-| * 52333b6 (origin/chore/a2-deployment-configuration, chore/a2-deployment-configuration) docs: add changelog and pytest configuration
-| * ab612b4 build: add deployment configuration and continuous integration
+| * 3f29a55 (origin/story/08-schedule) feat(story-08): filter schedule by tutor, print styles, student sessions link
+|/  
+| *   e955890 (origin/story/10-delivery) merge main into story/10-delivery
+| |\  
+| |/  
+|/|   
+| * faeecdd docs(story-10): add troubleshooting notes to the README
+| | * d0f9b42 (origin/story/09-tutor-view) feat(story-09): switch the tutor view between the next week and all upcoming
+| |/  
+|/|   
+* |   667fbbd Merge branch 'docs/readme' into main
+|\ \  
+| * | d754c54 (origin/docs/readme) docs: document Docker, CI and the development workflow in the README
+| * | 619a561 docs: rename the design spec and implementation plan
+|/ /  
+* |   36f7ab8 Merge pull request #16 from docs/evidence-captures
+|\ \  
+| * | 0174f50 (origin/docs/evidence-captures, docs/evidence-captures) docs: capture repository evidence for the submission
+|/ /  
+* |   33c9c61 (tag: v0.2.0) Merge pull request #15 from chore/a2-deployment-configuration
+|\ \  
+| * | 52333b6 (origin/chore/a2-deployment-configuration, chore/a2-deployment-configuration) docs: add changelog and pytest configuration
+| * | ab612b4 build: add deployment configuration and continuous integration
+| |/  
 * |   81f2441 Merge pull request #14 from group-a/story-05-availability
 |\ \  
 | * | c9d1c1f (origin/group-a/story-05-availability, group-a/story-05-availability) feat(story-05): reject duplicate availability windows
@@ -21,16 +43,16 @@
 | |/  
 * | a2f77b3 (tag: v0.1.0) Merge pull request #11 from story/10-delivery
 |\| 
-| * c53ed9e (origin/story/10-delivery) docs(story-10): record the team split and delegated work
+| * c53ed9e docs(story-10): record the team split and delegated work
 | * 3906425 docs(story-10): add the Jira backlog import
 | * 57b5b34 docs(story-10): add the README and handover document
 * | 2c48038 Merge pull request #10 from story/09-tutor-view
 |\| 
-| * d68588e (origin/story/09-tutor-view) feat(story-09): add the tutor's upcoming sessions view
+| * d68588e feat(story-09): add the tutor's upcoming sessions view
 | * 45c19a6 test(story-09): add tutor view tests
 * | 1e86c81 Merge pull request #9 from story/08-schedule
 |\| 
-| * 31b756a (origin/story/08-schedule) feat(story-08): add the schedule and student history pages
+| * 31b756a feat(story-08): add the schedule and student history pages
 | * f7a1355 feat(story-08): add schedule queries and the student sessions route
 | * 5571a60 test(story-08): add schedule and student history tests
 * | 68889d6 Merge pull request #8 from story/07-manage-session
