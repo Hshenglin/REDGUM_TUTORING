@@ -4,15 +4,21 @@
 
 | Capability | Jira story | Notes |
 |------------|-----------|-------|
-| Login with administrator and tutor roles | RG-02 | Signed session cookie, bcrypt passwords |
-| Administrator maintains students | RG-03 | Add, search, edit, deactivate; name, year level and family contact required |
-| Administrator maintains tutors | RG-04 | Add, edit, deactivate; subjects recorded; deactivated tutors cannot be booked |
-| Administrator maintains availability windows | RG-05 | Day, start and end per window; several windows per tutor |
-| Booking a session with the availability rule | RG-06 | 60 or 90 minutes; must fit entirely inside one window for that day, with a clear refusal message |
-| Moving, cancelling and marking sessions | RG-07 | Re-checks availability on move; cancelled sessions stay visible; attended and missed recorded |
-| Day and week schedule, student history | RG-08 | Filter by tutor; a student's past and future sessions are listed |
-| Tutor view of their own sessions | RG-09 | Only the signed-in tutor's upcoming sessions |
-| Seed data, README, handover, backlog | RG-10 | Runs from a clean checkout with Python only |
+| Login with administrator and tutor roles | US-01 | Signed session cookie, bcrypt passwords; tutors are blocked from admin routes |
+| Student records | US-02 | Add, search, edit and deactivate; name, year level and family contact required |
+| Tutor records | US-03 | Add, edit and deactivate; subjects recorded; deactivated tutors cannot be booked |
+| Weekly availability windows | US-04 | Day, start and end per window; several windows per tutor |
+| Booking inside availability | US-05 | 60 or 90 minutes; the full session must fit one matching window, with a clear refusal message |
+| Move, cancel and record outcomes | US-06 | Re-checks availability on move; cancelled sessions stay visible; attended and missed recorded |
+| Day and week schedule plus student history | US-07 | Filter by tutor; a student's past and future sessions are listed |
+| Tutor view of their own sessions | US-08 | Only the signed-in tutor's future booked sessions |
+| Student search by family contact | US-09 | Contact-name search respects the status filter |
+| Tutor search by subject | US-10 | Subject search returns matching tutors; a nonsense term returns no matches |
+| Bounded student and tutor fields | US-11 | Over-limit input returns status 400 with a clear message; boundary values pass |
+| Edit an availability window | US-12 | Prefilled form; a valid edit redirects with status 303 |
+| Reject duplicate availability | US-13 | A duplicate returns status 400 and creates no second row |
+| Docker and continuous integration | US-14 | The image builds; GitHub Actions runs the suite on push and pull request |
+| Filter and print a tutor schedule | US-15 | The tutor filter survives day and week views; print CSS hides navigation and controls |
 
 All acceptance criteria are covered by automated tests (`pytest`); the availability rule has
 its own unit test file (`tests/test_availability_rule.py`).
@@ -24,20 +30,14 @@ is out of scope for this sprint. All items sit in the product backlog (`docs/jir
 
 | Requested | Source | Why parked |
 |-----------|--------|-----------|
-| Room allocation and room clash detection | Deb, brief | Explicitly out of scope in the brief |
-| Detecting overlapping or double bookings | Brief | Explicitly out of scope in the brief |
-| Invoices, fees, prepaid packs and payments | Helen, Deb | Explicitly out of scope |
-| Tutor timesheets and payroll | Helen, Tomás | Explicitly out of scope |
+| Term unavailability for tutors | Availability card | Needs a date-specific absence model; next sprint |
+| Overlap detection for tutor and student | Brief | Explicitly out of scope in the brief |
+| Room allocation and clash detection | Deb, brief | Explicitly out of scope in the brief |
+| Invoices, fees and prepaid packs | Helen, Deb | Explicitly out of scope |
 | SMS or email reminders | Helen | Explicitly out of scope |
+| Audit trail | Governance review | Who moved, cancelled or marked a session; next release |
 | Parent portal and self-service booking | Helen | Explicitly out of scope |
-| Video session links | Brief | Explicitly out of scope |
 | Blue card expiry tracking | Helen | Explicitly out of scope |
-| Accounting reports / Xero | Helen | Explicitly out of scope |
-| January intensive, NAPLAN workshops, pizza night | Helen | Not part of the scheduling problem |
-| Term unavailability (e.g. Tomás away week 8) | Availability card | Needs a date-specific absence model; next sprint |
-| Tutor weekly session cap (8 sessions) | Availability card | A policy rule, not required by the sprint stories |
-| "Students who have not booked in three weeks" report | Helen | Reporting is backlog |
-| Printing the week per tutor | Deb | The schedule page can be printed from the browser; a dedicated print view is backlog |
 
 ## 3. Setup and run instructions from GitHub
 
@@ -109,11 +109,8 @@ In priority order:
 2. **Overlap detection** — refuse two sessions for the same tutor or student at the same time.
 3. **Room allocation and clash detection** — Deb's quarter-hour room turnaround is currently
    managed by hand.
-4. **Printable tutor week** — one page per tutor for the week, replacing Deb's photocopied diary.
-5. **Invoices and prepaid packs** — two days a month of Deb's time.
-6. **SMS reminders** — the night-before reminder Helen keeps asking for.
-7. **Attendance and cancellation policy support** — record whether a cancellation was in time
-   and whether it is chargeable (the diary's C vs CL distinction).
-8. **Audit trail** — who moved or cancelled a session.
-9. **Weekly session cap** — warn when a tutor is booked past their stated maximum.
-10. **"Not booked in three weeks" report** — Helen's money-walking-out-the-door list.
+4. **Invoices and prepaid packs** — two days a month of Deb's time.
+5. **SMS reminders** — the night-before reminder Helen keeps asking for.
+6. **Audit trail** — who moved or cancelled a session.
+7. **Parent portal and self-service booking** — lets a family book without phoning the centre.
+8. **Blue card expiry tracking** — blocks new bookings when a tutor's clearance has lapsed.
